@@ -37,15 +37,15 @@ public:
 
 /* Routines that are independent of <T>, make them not be in class */
 
-extern int FileWriter_open(char *pathname);
+extern long FileWriter_open(char *pathname);
 
-extern void FileWriter_close(int fs_ptr);
+extern void FileWriter_close(long fs_ptr);
 
-extern int FileWriter_flush(int fs_ptr);
+extern int FileWriter_flush(long fs_ptr);
 
-extern int FileWriter_getpos(int fs_ptr);
+extern int FileWriter_getpos(long fs_ptr);
 
-extern void FileWriter_setpos(int fs_ptr, int pos);
+extern void FileWriter_setpos(long fs_ptr, int pos);
 
 template<class T>
 static inline void FileWriter_write(int fs_ptr, T data) {
