@@ -1,0 +1,166 @@
+/*
+ * Copyright 2005 by the Massachusetts Institute of Technology.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software and its documentation for any purpose and without
+ * fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright
+ * notice and this permission notice appear in supporting
+ * documentation, and that the name of M.I.T. not be used in
+ * advertising or publicity pertaining to distribution of the
+ * software without specific, written prior permission.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is"
+ * without express or implied warranty.
+ */
+
+/**
+ * @description
+ * This file contains functions that allow one to decode MPEG-2 compliant video. 
+ * The code is based on the MPEG-2 specification (ISO/IEC 13818-2). The MPEG-2 decoding
+ * is a work in progress, although it works within a limited test range. Throughout the 
+ * source code, citations are made in cases where an understanding of the code would be
+ * helped by looking at an outside source. The format I have chosen is 
+ * (cite NUM#, LOOKUP_INFO). NUM=1 refers to ISO/IEC: 13818-2, and NUM=2 refers to the reference
+ * MPEG implementation written in C, available at [www.mpeg.org].
+ *
+ * @author <a href="mailto:madrake@gmail.com">Matthew Drake</a>
+ * @file MPEGdecoder.str.pre
+ * @version 1.0
+ */
+
+// Comments for readers of the StreamIt MPEG specification:
+//
+// TODO notes refer to parts of the MPEG-2 specification which this
+// program does not yet handle, or assumptions made by the program.
+// FEATURETODO notes refer to changes that ought to be made to the program,
+// or support which can be added for more of the MPEG-2 specification, which
+// is pending the addition of features to the StreamIt language compiler.
+// In general I have tried to document my code, and refer to the MPEG-2
+// specification whenever I used it. If you are looking at any particular
+// block of code and aren't sure what it is doing, find the previous citation
+// comment, and refer to the corresponding page in the MPEG 2 spec.
+
+/**
+ * Interprets and decodes a compressed MPEG-2 compliant bit stream, in accordance
+ * with the IEEE MPEG-2 specification.
+ * @param width The resolution width of the video. This variable is only needed until the StreamIt
+ *              language supports dynamically reconfiguring splijtoins.
+ * @param height The resolution height of the video. This variable is only needed until the StreamIt
+ *               language supports dynamically reconfiguring splitjoins.
+ * @input An MPEG-2 compliant bit stream of variable length.
+ * @output Outputs a series of images representing the frames of the video. Each image
+ *         consists of 3 integers for each pixel, with the number of pixels per image 
+ *         equalling the width * height of the video. Frames are output in time order,
+ *         top to bottom, left to right, and RGB color order.
+ */
+bit->int pipeline MPEGStream_to_rawImageStream(int width, int height,
+                                               int the_chroma_format) {
+    // width, height, chroma: Hacked till we have reprogrammable splitjoins FEATURETODO
+
+    portal<InverseQuantization_AC_Coeff> UpdatePortal_quantiser_data_ac;
+    portal<InverseQuantizationJoinerSubstitute> UpdatePortal_macroblock_intra;
+    portal<InverseQuantization_DC_Intra_Coeff> UpdatePortal_quantiser_data_dc;
+    portal<MotionPrediction> UpdatePortal_picture_type;
+    portal<MotionVectorDecode> UpdatePortal_mvd;
+    portal<PictureReorder> UpdatePortal_picture_type2;
+    portal<SendBackReferenceFrame> UpdatePortal_picture_type3;
+ 
+    add MPEGStreamParser(UpdatePortal_quantiser_data_ac,
+                         UpdatePortal_quantiser_data_dc,
+                         UpdatePortal_macroblock_intra,
+                         UpdatePortal_picture_type,
+                         UpdatePortal_mvd,
+                         UpdatePortal_picture_type2,
+                         UpdatePortal_picture_type3,
+                         width,
+                         height,
+                         the_chroma_format
+                         );
+
+    add int->int splitjoin {
+        split roundrobin(64*blocks_per_macroblock[the_chroma_format], 16, 3);
+        add BlockDecode(UpdatePortal_quantiser_data_ac, 
+                        UpdatePortal_macroblock_intra, 
+                        UpdatePortal_quantiser_data_dc);
+        add int->int pipeline {
+            add MotionVectorDecode() to UpdatePortal_mvd;
+            add Repeat(8, blocks_per_macroblock[the_chroma_format]);
+        }
+        add Repeat(3, blocks_per_macroblock[the_chroma_format]); // macroblock_intra
+        join roundrobin(64, 8, 3);
+    }
+
+    // Each output channel is ordered left to right, top to bottom
+
+    add ColorChannelProcessing(width, 
+                               height, 
+                               UpdatePortal_picture_type, 
+                               the_chroma_format,
+                               UpdatePortal_picture_type3);
+
+    // FEATURETODO This next component should also use the UpdatePortal_picture_type
+    // but it doesn't because of messaging limitations.
+    add PictureReorder(width, height) to UpdatePortal_picture_type2;
+
+    // This function assumes that no sequence display extension was ever
+    // encountered in the data stream, and the default colorspace transformations 
+    // apply.
+    // (cite 1, P. 47, Table 6-9): Refer to entry 1, which is
+    // Recommendation ITU-R BT.709 for transformations.
+    add ColorSpaceConversion_YCbCrtoRGB;
+
+}
+
+/**
+ * @internal
+ */
+int->int pipeline LuminanceChannelProcessing(int width, 
+                                             int height,
+                                             portal<MotionPrediction> UpdatePortal_picture_type,
+                                             int the_chroma_format,
+                                             portal<SendBackReferenceFrame> UpdatePortal_picture_type3) {
+    add MacroBlockDescrambler(width, 64+11, 2);
+    add DescrambleAndMotionCompensate(width, 
+                                      height, 
+                                      1, 
+                                      1, 
+                                      UpdatePortal_picture_type, 
+                                      1, 
+                                      the_chroma_format, 
+                                      UpdatePortal_picture_type3);
+}
+
+/**
+ * @internal
+ */
+int->int pipeline ChrominanceChannelProcessing(int width, 
+                                               int height,
+                                               portal<MotionPrediction> UpdatePortal_picture_type,
+                                               int the_chroma_format,
+                                               portal<SendBackReferenceFrame> UpdatePortal_picture_type3) {
+    // Assumes 4:2:0 to 4:4:4 or 4:2:2 to 4:4:4
+    // Adding 4:4:4 support requires some additional block reordering.
+    if (the_chroma_format == 2) {
+        add MacroBlockDescrambler(width/2, 64+11, 1);
+    }
+    int vertical_upsample_factor;
+    if (the_chroma_format == 1) {
+        vertical_upsample_factor = 2;
+    } else {
+        vertical_upsample_factor = 1;
+    }
+    add DescrambleAndMotionCompensate(width, 
+                                      height, 
+                                      vertical_upsample_factor, 
+                                      2, 
+                                      UpdatePortal_picture_type, 
+                                      0, 
+                                      the_chroma_format,
+                                      UpdatePortal_picture_type3);
+    if (the_chroma_format == 1) {
+        add ChannelUpsample_Vert_and_Horz(width/2, height/2);
+    } else {
+        add ChannelUpsample_Horizontal(width/2, height);
+    }
+}

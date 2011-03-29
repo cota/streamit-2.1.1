@@ -1,0 +1,134 @@
+// Implements DES encyption algorithm
+// (rodric rabbah, <rabbah@mit.edu>)
+
+void->void pipeline DES
+{
+    int testvector = 7;
+
+    add PlainTextSource(testvector);
+    add DEScoder(testvector);
+    add HexPrinter(CIPHERTEXT, 64);
+}
+
+bit->bit pipeline DEScoder(int vector)
+{
+    // initial permutation of 64 bit plain text
+    add doIP();
+
+    for (int i = 0; i < MAXROUNDS; i++) {
+        add splitjoin {
+            split duplicate;
+            // R[i+1] = f(R[i]) xor L[i]
+            add nextR(vector, i);
+            // L[i+1] = R[i]
+            add nextL();
+            join roundrobin(32, 32);
+        }
+    }
+    add CrissCross();
+
+    add doIPm1();
+}
+
+bit->bit filter doIP()
+{
+    work push 64 pop 64 {
+        for (int i = 0; i < 64; i++) {
+            push(peek(IP[i] - 1));
+        }
+        for (int i = 0; i < 64; i++) {
+            pop();
+        }
+    }
+}
+
+// L[i+1] is lower 32 bits of current 64 bit input
+// input  is LR[i]
+// output is  R[i]
+bit->bit pipeline nextL()
+{
+    add splitjoin {
+        split roundrobin(32, 32);
+        add Identity<bit>();                           // R[i] is forwarded to next round
+        add bit->void filter { work pop 1 { pop(); } } // L[i] is decimated
+        join roundrobin(32, 0);
+    }
+}
+
+// R[i+1] is f(R[i]) xor L[i]
+// R[i] is lower 32 bits of input stream
+// L[i] is upper 32 bits of input stream
+// input is LR[i]
+// output is f(R[i]) xor L[i]
+bit->bit pipeline nextR(int vector, int round)
+{
+    add splitjoin {
+        split roundrobin(32, 32);
+        add f(vector, round);
+        add Identity<bit>();
+        join roundrobin;
+    }
+    add Xor(2);
+}
+
+bit->bit pipeline f(int vector, int round)
+{
+    // expand R from 32 to 48 bits and xor with key
+    add splitjoin {
+        split roundrobin(32, 0);
+        add doE(); 
+        add KeySchedule(vector, round); 
+        join roundrobin;
+    }
+    add Xor(2);
+
+    // apply substitutions to generate 32 bit cipher
+    add Sboxes();
+
+    // permute the bits
+    add doP();
+}
+
+bit->bit filter doE()
+{
+    work pop 32 push 48 {
+        for (int i = 0; i < 48; i++) {
+            push(peek(E[i] - 1));
+        }
+        for (int i = 0; i < 32; i++) {
+            pop();
+        }
+    }
+}
+
+bit->bit filter doP()
+{
+    work pop 32 push 32 {
+        // input bit stream is from MSB ... LSB 
+        // that is LSB is head of FIFO, MSB is tail of FIFO
+        // as in b63 b62 b61 b60 ... b3  b2  b1  b0
+        // but P permutation requires bit numbering from left to right
+        // as in b1  b2  b3  b4  ... b61 b62 b63 b64
+        // (note indexing from 0 vs 1)
+        // permutation P permutes the bits and emits them
+        // in reverse order
+        for (int i = 31; i >= 0; i--) {
+            push(peek(32 - P[i]));
+        }
+        for (int i = 0; i < 32; i++) {
+            pop();
+        }
+    }
+}
+
+bit->bit filter doIPm1()
+{
+    work push 64 pop 64 {
+        for (int i = 0; i < 64; i++) {
+            push(peek(IPm1[i] - 1));
+        }
+        for (int i = 0; i < 64; i++) {
+            pop();
+        }
+    }
+}

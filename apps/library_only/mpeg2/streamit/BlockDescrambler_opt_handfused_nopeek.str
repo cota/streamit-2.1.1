@@ -1,0 +1,60 @@
+/*
+ * Copyright 2005 by the Massachusetts Institute of Technology.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software and its documentation for any purpose and without
+ * fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright
+ * notice and this permission notice appear in supporting
+ * documentation, and that the name of M.I.T. not be used in
+ * advertising or publicity pertaining to distribution of the
+ * software without specific, written prior permission.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is"
+ * without express or implied warranty.
+ */
+
+/**
+ * @description
+ * This file contains functions that allow one to decode MPEG-2 compliant video. 
+ * The code is based on the MPEG-2 specification (ISO/IEC 13818-2). The MPEG-2 decoding
+ * is a work in progress, although it works within a limited test range. Throughout the 
+ * source code, citations are made in cases where an understanding of the code would be
+ * helped by looking at an outside source. The format I have chosen is 
+ * (cite NUM#, LOOKUP_INFO). NUM=1 refers to ISO/IEC: 13818-2, and NUM=2 refers to the reference
+ * MPEG implementation written in C, available at [www.mpeg.org].
+ *
+ * @author <a href="mailto:madrake@gmail.com">Matthew Drake</a>
+ * @file BlockDescrambler_opt_handfused_nopeek.str
+ * @version 1.0
+ */
+
+/**
+ * @internal
+ *
+ * This is a filter version of the block descrambler that should avoid
+ * some fusion overhead.  This version uses a buffer so that no peek
+ * statements are needed.  It is probably slower than
+ * BlockDescramblerFilter1, but including for future experiments.
+ */
+int->int filter BlockDescrambler(int width) {
+    work push 8*width pop 8*width {
+        int[8*width] buffer;
+        for (int i=0; i<width; i+=8) {
+            for (int j=0; j<8; j++) {
+                int k = j*width+i;
+                buffer[k] = pop();
+                buffer[k+1] = pop();
+                buffer[k+2] = pop();
+                buffer[k+3] = pop();
+                buffer[k+4] = pop();
+                buffer[k+5] = pop();
+                buffer[k+6] = pop();
+                buffer[k+7] = pop();
+            }
+        }
+        for (int i=0; i<8*width; i++) {
+            push(buffer[i]);
+        }
+    }
+}

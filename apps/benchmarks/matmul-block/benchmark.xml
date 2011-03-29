@@ -1,0 +1,19 @@
+<benchmark>
+  <name>matmul-block</name>
+  <desc>Blocked matrix multiply</desc>
+  <description>
+Generates series of matrices, and multiplies them.  In order to reduce
+the amount of communication, the matrices are divided into equal-sized
+submatrices, which are reordered, pairwise multiplied, and reordered
+again to get the final result matrix.
+  </description>
+  <implementations>
+    <impl lang="C" dir="c">
+      <file>matmul-block.c</file>
+    </impl>
+    <impl lang="StreamIt" dir="streamit">
+      <file class="source">MatrixMultBlock.str</file>
+      <file class="output">MatrixMultBlock.out</file>
+    </impl>
+  </implementations>
+</benchmark>

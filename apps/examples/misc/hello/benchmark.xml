@@ -1,0 +1,15 @@
+<benchmark>
+  <name>hello</name>
+  <desc>Analog of "Hello World!" in StreamIt: outputs a sequence of numbers</desc>
+  <description>
+This is a demonstration benchmark, intended to be the simplest
+possible StreamIt program.  There are two filters; the first generates
+an increasing sequence of numbers, the second prints this sequence.
+  </description>
+  <implementations>
+    <impl lang="StreamIt">
+      <file>HelloWorld.str</file>
+      <file class="output">HelloWorld.out</file>
+    </impl>
+  </implementations>
+</benchmark>

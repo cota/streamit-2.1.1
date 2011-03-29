@@ -1,0 +1,141 @@
+Options to the StreamIt 'strc' Compiler Script
+==============================================
+
+This is for the January 29, 2007 release of the StreamIt compiler and
+runtime system, version 2.1.1.
+$Id: options.tex.in,v 1.12 2006/08/29 23:40:42 thies Exp $
+
+
+Basic Usage
+-----------
+
+strc Foo.str
+
+Reads Foo.str, produces Foo.java as an intermediate file, compiles this
+down to a number of C++ files, and then compiles and links this to
+produce a binary, a.out.
+
+
+Options
+-------
+
+--help
+      Displays a summary of common options.
+
+--more-help
+      Displays a summary of advanced options (which are not described
+      below).
+
+--cluster <n>
+      Compile for a cluter or multicore with <n> nodes.
+
+--library
+      Produce a Java file compatible with the StreamIt Java library, and
+      compile and run it.
+
+--simpleC
+      Generate a simple C file that inlines the entire application into a
+      single function. This is sometimes more readable than the default
+      uniprocessor output, but the backend is not fully-featured.
+
+--raw <n>, -r <n>
+      Compile for an <n>-by-<n> Raw processor.
+
+--rstream, -R
+      Generate a C-like file to be compiled by the RStream compiler from
+      Reservoir Labs.
+
+--output <filename>, -o <filename>
+      Places the resulting binary in <filename>.
+
+--verbose
+      Show intermediate commands as they are executed.
+
+
+Options available for all backends
+
+-O0   
+      Do not optimize (default).
+
+-O1   
+      Perform basic optimizations that should improve performance in most
+      cases. Adds --unroll 16 --destroyfieldarray --partition --wbs.
+
+-O2   
+      Perform extended optimizations that should improve performance in
+      most cases, but may also cause the compiler to become unstable.
+      Adds --unroll 256 --destroyfieldarray --partition --wbs --macros.
+
+--iterations <n>, -i<n>
+      Run the program for <n> steady-state iterations. Defaults to
+      infinity. For the uniprocessor, cluster, and simpleC backends, the
+      number of iterations can also be passed at the command line of the
+      final executable (a.out -i 100).
+
+--linearreplacement
+      Domain-specific optimization: combine adjacent ``linear'' filters
+      in the program into a single matrix multiplication operation
+      wherever possible. Corresponds to the ``linear'' option in the
+      PLDI'03 paper.
+
+--statespace
+      In combination with --linearreplacement, performs combination and
+      optimization of linear statespace filters as described in the
+      CASES'05 paper.
+
+--unroll <n>, -u<n>
+      Specify loop unrolling limit. The default value is 0.
+
+
+Options specific to Uniprocessor and Cluster backends
+
+--cacheopt
+      Performs cache optimizations as described in the LCTES'05 paper.
+
+--l1d <n>
+      Sets the L1 data cache size (in KB) for cache optimizations. The
+      default is 8 KB.
+
+--l1i <n>
+      Sets the L1 instruction cache size (in KB) for cache optimizations.
+      The default is 8 KB.
+
+--l2 <n>
+      Sets the L2 cache size (in KB) for cache optimizations (we assume a
+      unified L2 cache). The default is 256 KB.
+
+--linearpartition, -L
+      Domain-specific optimization: perform linear replacement and
+      frequency replacement selectively, based on an estimate of where it
+      is most beneficial. Corresponds to the ``autosel'' option in the
+      PLDI'03 paper. (Relies on FFTW installation.)
+
+
+Options specific to Raw backend
+
+--asciifileio
+      Specifies that FileReader's and FileWriter's should use ASCII
+      format rather than binary. Also works under the --simpleC backend.
+
+--numbers <n>, -N<n>
+      Instrument code to gather performance statistics on simulated code
+      over <n> steady-state cycles. The results are placed in results.out
+      in the current directory.
+
+--ssoutputs <n>
+      For applications containing a dynamic I/O rate, this option
+      indicates how many outputs should count as a steady-state when
+      gathering numbers (with --numbers).
+
+--rawcol <m>, -c<m>
+      Specify number of columns in Raw processor; --raw specifies number
+      of rows.
+
+--wbs 
+      When laying out communication instructions, use the work-based
+      simulator to estimate exactly when items will be produced and
+      consumed. This improves the scheduling of routing instructions.
+
+------------------------------------------------------------------------
+
+  This document was translated from LATEX by HEVEA.

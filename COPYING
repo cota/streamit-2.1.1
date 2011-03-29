@@ -1,0 +1,42 @@
+Copyright and License for the StreamIt Release
+----------------------------------------------
+
+StreamIt is copyright 2006 by the Massachusetts Institute of
+Technology.  Different parts of the source code are covered by
+different licenses.
+
+The "src/at" directory (and all subdirectories) are released under the
+terms of the GNU General Public License, version 2 or (at your option)
+any later version; see the COPYING.GPL file for details.  This
+includes most of the compiler, with the exception of the front end and
+the scheduler (which are under "src/streamit").
+
+The rest of the code is released subject to the following license:
+
+  Copyright 2006 by the Massachusetts Institute of Technology.
+
+  Permission to use, copy, modify, and distribute this
+  software and its documentation for any purpose and without
+  fee is hereby granted, provided that the above copyright
+  notice appear in all copies and that both that copyright
+  notice and this permission notice appear in supporting
+  documentation, and that the name of M.I.T. not be used in
+  advertising or publicity pertaining to distribution of the
+  software without specific, written prior permission.
+  M.I.T. makes no representations about the suitability of
+  this software for any purpose.  It is provided "as is"
+  without express or implied warranty.
+
+Files which may be used under this license include:
+
+-- All of the code in the 'src/streamit' directory of the source
+   release, and child directories, including the StreamIt-to-Java
+   converter, the StreamIt Java runtime library, and the scheduler;
+-- The StreamIt cluster C++ library in the 'library/cluster' directory;
+-- All of the StreamIt .str files in the 'apps' directory;
+-- StreamIt code in the documentation provided in the 'docs' directory,
+   and child directories; and
+-- The .bc files in the 'include' directory.
+
+Finally, please note that the .jar files we are redistributing under
+the 3rdparty directory are covered by their own respective licenses.

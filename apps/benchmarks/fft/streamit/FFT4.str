@@ -1,0 +1,79 @@
+void->void pipeline FFT4 {
+    add OneSource();
+    add FFTKernel(32);
+    add FloatPrinter();
+}
+
+float->float pipeline FFTKernel (int N) {
+    /* This bit-reverse stage was published in the original CC paper,
+     * but it has a bug and causes the output to be wrong.
+
+    add splitjoin {
+	split roundrobin(N/2, N/2);
+	for (int i=0; i<2; i++) {
+	    add splitjoin {
+		split roundrobin();
+		add Identity<float>();
+		add Identity<float>();
+		join roundrobin(N/4, N/4);
+	    };
+	}
+	join roundrobin();
+    };
+    */
+    for (int i=1; i<N; i*=2) {
+	add Butterfly(i, N);
+    }
+}
+
+float->float pipeline Butterfly (int N, int W) {
+    add splitjoin {
+	split roundrobin(N, N);
+	add Identity<float>();
+	add Multiply();
+	join roundrobin();
+    };
+    add splitjoin {
+	split duplicate;
+	add Add();
+	add Subtract();
+	join roundrobin(N, N);
+    };
+}
+
+void->float filter OneSource {
+    work push 1 {
+	push(1);
+    }
+}
+
+float->float filter Multiply {
+    // just multiplying by 2 for now instead of calculating weights
+    work push 1 pop 1 {
+	push(2 * pop());
+    }
+}
+
+float->float filter Add {
+    work push 1 pop 2 {
+	push(peek(0) + peek(1));
+	pop();
+	pop();
+    }
+}
+
+float->float filter Subtract {
+    work push 1 pop 2 {
+	push(peek(0) - peek(1));
+	pop();
+	pop();
+    }
+}
+
+float->void filter FloatPrinter {
+    work pop 1 {
+	println(pop());
+    }
+}
+
+

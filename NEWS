@@ -1,0 +1,39 @@
+Changes in the StreamIt Infrastructure
+======================================
+
+This is for the January 29, 2007 release of the StreamIt compiler and
+runtime system, version 2.1.1.
+$Id: news.tex.in,v 1.10 2006/09/11 20:06:53 thies Exp $
+
+
+streamit-2.1.1
+--------------
+
+  * Snapshot release of internal infrastructure (September 2006). This
+    snapshot has new features, bug fixes, and possibly new bugs compared
+    to the initial public release. Major features are as follows, please
+    contact us if you have any questions:
+
+      * Multi-threaded backend for multicores and clusters of
+        workstations.
+
+      * Support for dynamic rates and teleport messaging.
+
+      * Faster uniprocessor implementation (up to 2X).
+
+      * Faster and more memory-efficient Java library (up to 10X).
+
+      * MPEG-2 and JPEG applications (limited compiler support; full
+        support in Java library).
+
+      * Snapshot of cache optimizations and linear statespace analysis.
+
+
+streamit-2.0
+------------
+
+  *  Initial public release (October 2003).
+
+------------------------------------------------------------------------
+
+  This document was translated from LATEX by HEVEA.

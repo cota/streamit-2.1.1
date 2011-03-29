@@ -1,0 +1,25 @@
+\begin{tocenv}
+\tocitem \@locref{htoc1}{\begin{@norefs}\@print{1}\quad{}StreamIt Overview\end{@norefs}}
+\tocitem \@locref{htoc2}{\begin{@norefs}\@print{2}\quad{}Programming in StreamIt\end{@norefs}}
+\begin{tocenv}
+\tocitem \@locref{htoc3}{\begin{@norefs}\@print{2.1}\quad{}A Minimal Program\end{@norefs}}
+\tocitem \@locref{htoc4}{\begin{@norefs}\@print{2.2}\quad{}A Moving Average Filter\end{@norefs}}
+\tocitem \@locref{htoc5}{\begin{@norefs}\@print{2.3}\quad{}A Low-Pass Filter\end{@norefs}}
+\tocitem \@locref{htoc6}{\begin{@norefs}\@print{2.4}\quad{}A Band-Pass Filter\end{@norefs}}
+\tocitem \@locref{htoc7}{\begin{@norefs}\@print{2.5}\quad{}An Equalizer\end{@norefs}}
+\tocitem \@locref{htoc8}{\begin{@norefs}\@print{2.6}\quad{}An Echo\end{@norefs}}
+\tocitem \@locref{htoc9}{\begin{@norefs}\@print{2.7}\quad{}Fibonacci\end{@norefs}}
+\end{tocenv}
+\tocitem \@locref{htoc10}{\begin{@norefs}\@print{3}\quad{}Using the StreamIt Compiler\end{@norefs}}
+\begin{tocenv}
+\tocitem \@locref{htoc11}{\begin{@norefs}\@print{3.1}\quad{}Compiling for a Uniprocessor\end{@norefs}}
+\tocitem \@locref{htoc12}{\begin{@norefs}\@print{3.2}\quad{}Compiling for a Cluster or Multicore\end{@norefs}}
+\begin{tocenv}
+\tocitem \@locref{htoc13}{\begin{@norefs}\@print{3.2.1}\quad{}Multicores\end{@norefs}}
+\tocitem \@locref{htoc14}{\begin{@norefs}\@print{3.2.2}\quad{}Cluster of Workstations\end{@norefs}}
+\end{tocenv}
+\tocitem \@locref{htoc15}{\begin{@norefs}\@print{3.3}\quad{}Using the Java Library\end{@norefs}}
+\end{tocenv}
+\tocitem \@locref{htoc16}{\begin{@norefs}\@print{A}\quad{}Keyword Review\end{@norefs}}
+\tocitem \@locref{htoc17}{\begin{@norefs}\@print{B}\quad{}Options\end{@norefs}}
+\end{tocenv}

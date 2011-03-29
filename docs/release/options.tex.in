@@ -1,0 +1,32 @@
+\documentclass{article}
+
+\usepackage{hyperref}
+
+\newcommand\filename[1]{\textsf{#1}}
+
+\title{Options to the StreamIt 'strc' Compiler Script}
+
+\begin{document}
+\maketitle
+
+\noindent
+% note: RELEASE_DATE resolved in Makefile
+This is for the RELEASE_DATE release of the StreamIt compiler and
+runtime system, version 2.1.1.\\
+\verb|$Id: options.tex.in,v 1.12 2006/08/29 23:40:42 thies Exp $|
+
+\section*{Basic Usage}
+
+\begin{verbatim}
+strc Foo.str
+\end{verbatim}
+
+Reads \filename{Foo.str}, produces \filename{Foo.java} as an
+intermediate file, compiles this down to a number of C++ files, and
+then compiles and links this to produce a binary, \filename{a.out}.
+
+\section*{Options}
+
+\input{options-list}
+
+\end{document}

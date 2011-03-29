@@ -1,0 +1,19 @@
+<benchmark>
+  <name>matrixmult</name>
+  <desc>Multiply two matrices</desc>
+  <description>
+Perform a matrix-matrix multiply on square matrices.  Matrices are
+translated and duplicated, such that a MultiplyAccumulate stage can
+perform vector-vector dot products to get ordered elements of the
+result matrix.
+  </description>
+  <implementations>
+    <impl lang="C">
+      <file>matrix.c</file>
+    </impl>
+    <impl lang="StreamIt" compile_time="2400">
+      <file class="source">MatrixMult.str</file>
+      <file class="output">MatrixMult.out</file>
+    </impl>
+  </implementations>
+</benchmark>

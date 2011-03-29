@@ -1,0 +1,1151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+            "http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD><TITLE>StreamIt Cookbook</TITLE>
+
+<META http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<META name="GENERATOR" content="hevea 1.06">
+</HEAD>
+<BODY >
+<!--HEVEA command line is: hevea -nosymb cookbook.hva png.hva cookbook.tex -->
+<!--HTMLHEAD-->
+<!--ENDHTML-->
+<!--PREFIX <ARG ></ARG>-->
+<!--CUT DEF section 1 -->
+
+
+<H1 ALIGN=center>StreamIt Cookbook</H1>
+
+<H3 ALIGN=center><TT>streamit@cag.lcs.mit.edu</TT></H3>
+
+<H3 ALIGN=center>September, 2006</H3>
+<!--TOC section StreamIt Overview-->
+
+<H2><A NAME="htoc1">1</A>&nbsp;&nbsp;StreamIt Overview</H2><!--SEC END -->
+
+Most data-flow or signal-processing algorithms can be broken down into
+a number of simple blocks with connections between them. In StreamIt
+parlance, the smallest block is a <EM>filter</EM>; it has a single input
+and a single output, and its body consists of Java-like code. Filters
+are then connected by placing them into one of three composite blocks:
+pipelines, split-joins, and feedback loops. Each of these structures
+also has a single input and a single output, so these blocks can be
+recursively composed.<BR>
+<BR>
+A typical streaming application might be a software FM radio, as shown
+in Figure <A HREF="#fig:fmradio">1</A>. The program receives its input from an
+antenna, and its output is connected to a speaker. The main program
+is a pipeline with a band-pass filter for the desired frequency, a
+demodulator, and an equalizer; the equalizer in turn is made up of a
+split-join, where each child adjusts the gain over a particular
+frequency range, followed by a filter that adds together the outputs
+of each of the bands.
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+ <DIV ALIGN=center>
+ <IMG SRC="cookbook001.png">
+ <BR>
+<DIV ALIGN=center>Figure 1: Stream graph for a software FM radio</DIV><BR>
+
+ <A NAME="fig:fmradio"></A>
+ </DIV>
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+Our goal with choosing these constructs was to create a language with
+most of the expressiveness of a general data-flow graph structure, but
+to keep the block-level abstraction that modern programming languages
+offer. Allowing arbitrary graphs makes scheduling and partitioning
+difficult for the compiler. The hierarchical graph structure allows
+the implementation of blocks to be ``hidden'' from users of the block;
+for example, an FFT could be implemented as a single filter or as
+multiple filters, but so long as there is a stream structure named
+``FFT'' somewhere in the program the actual implementation is
+irrelevant to other modules that use it. Since most graphs can be
+readily transformed into StreamIt structures, StreamIt is suitable for
+working on a wide range of signal-processing applications.<BR>
+<BR>
+<!--TOC section Programming in StreamIt-->
+
+<H2><A NAME="htoc2">2</A>&nbsp;&nbsp;Programming in StreamIt</H2><!--SEC END -->
+
+<BR>
+<!--TOC subsection A Minimal Program-->
+
+<H3><A NAME="htoc3">2.1</A>&nbsp;&nbsp;A Minimal Program</H3><!--SEC END -->
+
+<IMG SRC="cookbook002.png">
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>void-&gt;void&nbsp;pipeline&nbsp;Minimal&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;IntSource;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;IntPrinter;</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT>void-&gt;int&nbsp;filter&nbsp;IntSource&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;int&nbsp;x;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;init&nbsp;{&nbsp;x&nbsp;=&nbsp;0;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;push&nbsp;1&nbsp;{&nbsp;push(x++);&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT>int-&gt;void&nbsp;filter&nbsp;IntPrinter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;{&nbsp;print(pop());&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+This is the minimal interesting StreamIt program. <CODE>Minimal</CODE>
+is a StreamIt <EM>pipeline</EM>: the output of its first child is
+connected to the input of its second child, and so on. It has two
+children, a source and a sink. Each of these are implemented as
+StreamIt <EM>filter</EM> objects.<BR>
+<BR>
+A filter has two special functions, an <EM>init</EM> function and a
+<EM>work</EM> function. Both of these are present in
+<CODE>IntSource</CODE>. The init function runs once at the start of
+the program; the work function runs repeatedly forever. If the init
+function is omitted, as it is in <CODE>IntPrinter</CODE>, it is assumed
+to be empty. Work functions declare their <EM>data rates</EM>, which
+may be static or dynamic. The source here declares that each
+iteration of the work function pushes a single item on to its output;
+the sink declares that it pops a single item from its input.<BR>
+<BR>
+Every StreamIt structure has a single input and a single output. The
+filter and pipeline declarations here show the types of these inputs
+and outputs. C-like <CODE>int</CODE> and <CODE>float</CODE> types are
+available, along with <CODE>bit</CODE> for one-bit data and
+<CODE>complex</CODE> for complex floating-point data. <CODE>void</CODE>
+is used as a special type to indicate the boundary of the program:
+``the program'' in StreamIt is defined as a stream structure with both
+<CODE>void</CODE> input and output types. A filter that takes no input
+at all should also be declared to take <CODE>void</CODE> as its input
+type, and similarly a <CODE>void</CODE> output can be used if a filter
+produces no output.<BR>
+<BR>
+<!--TOC subsection How to Compile and Run-->
+
+<H3>How to Compile and Run</H3><!--SEC END -->
+
+The StreamIt compiler script <B>strc</B> can be used to compile and
+execute StreamIt programs. If you are using the StreamIt release, you
+can find all of the cookbook examples in the following directory:
+<PRE>
+cd $STREAMIT_HOME/apps/examples/cookbook
+</PRE>The minimal example is stored in <TT>Minimal.str</TT>, and the following
+command will compile it for the uniprocessor backend:
+<PRE>
+strc Minimal.str -o minimal
+</PRE>The resulting binary is stored in <TT>minimal</TT>, and it can be
+executed for 5 iterations as follows:
+<PRE>
+minimal -i 5
+</PRE>Doing so will print the integers from 0 to 4, in increasing order.<BR>
+<BR>
+During the course of compilation, a number of stream graphs are ouput
+to <TT>dot</TT> files in the current directory. The <TT>dot</TT> format can
+be displayed and converted to other formats using the Graphviz
+software, which is available online<SUP><A NAME="text1" HREF="#note1"><FONT SIZE=2>1</FONT></A></SUP>. Running the following command will draw
+the stream graph for the program, as pictured to the right of the
+source code above:
+<PRE>
+dotty stream-graph-simple.dot
+</PRE>There are many other <TT>dot</TT> files that are output by the compiler;
+see Section&nbsp;<A HREF="#sec:compiler">3</A> of this document for more details.<BR>
+<BR>
+<B>The Java Library.</B> In addition to using the StreamIt compiler,
+it is possible to convert StreamIt programs into equivalent Java
+programs that can be executed using any Java VM. This is particularly
+convenient for testing and debugging, as well as for cases when the
+compiler might encounter a bug.<BR>
+<BR>
+To run the <TT>Minimal</TT> program for 5 iterations in the Java library,
+do as follows:
+<PRE>
+strc --library Minimal.str -i 5
+</PRE>This command will output a <TT>Minimal.java</TT> file, compile it with a
+Java compiler, and run it using <TT>java</TT>. The output should always
+be identical to that obtained using the compiler. In addition, the
+library will output a <TT>Minimal.dot</TT> file that can be visualized
+using Graphviz.<BR>
+<BR>
+For more details on the StreamIt compiler and execution environment,
+please consult Section&nbsp;<A HREF="#sec:compiler">3</A>.
+
+<!--TOC subsection A Moving Average Filter-->
+
+<H3><A NAME="htoc4">2.2</A>&nbsp;&nbsp;A Moving Average Filter</H3><!--SEC END -->
+
+<IMG SRC="cookbook003.png">
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>void-&gt;void&nbsp;pipeline&nbsp;MovingAverage&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;IntSource();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;Averager(10);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;IntPrinter();</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT>int-&gt;int&nbsp;filter&nbsp;Averager(int&nbsp;n)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;push&nbsp;1&nbsp;peek&nbsp;n&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;sum&nbsp;=&nbsp;0;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;n;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sum&nbsp;+=&nbsp;peek(i);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(sum/n);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+Most of a typical StreamIt program consists of filters that produce
+some output from their input. The <CODE>Averager</CODE> filter shown
+here is such a filter. Like the filters shown before,
+<CODE>Averager</CODE> has a work function with statically declared
+input and output rates.<BR>
+<BR>
+In addition to peeking and popping, <CODE>Averager</CODE> <EM>peeks</EM>
+at its input stream. The <CODE>peek()</CODE> operator returns a
+particular item off of the input stream, with <CODE>peek(0)</CODE>
+returning the next item that would normally be popped. The work
+function must declare a peek rate if it peeks at all, but this peek
+rate is a maximum, rather than an exact, rate; it would be valid for
+the <CODE>Averager</CODE> filter to <CODE>peek(n-2)</CODE> and never
+<CODE>peek(n-1)</CODE>, but <CODE>peek(n)</CODE> is illegal. Note that
+mixing peeking and popping is valid, but that popping an item shifts
+the index of future peeks.<BR>
+<BR>
+<CODE>Averager</CODE> also has a <EM>stream parameter</EM>. The number
+<CODE>n</CODE> is the number of items to average. This is passed like
+a normal function parameter from the <CODE>add</CODE> statement that
+creates the filter. Within the filter, the parameter is a constant:
+it is illegal for code to modify the parameter. This allows parameter
+values to be used in expressions for <EM>e.g.</EM> I/O rates, as in the
+peek rate here.<BR>
+<BR>
+This program also provides a basic demonstration of StreamIt's filter
+scheduler. There is a guarantee that the <CODE>Averager</CODE> filter
+is not run until its input rates can be met, and in particular, that
+there are 10 inputs available so peeking can happen. For this to
+happen, the source needs to run nine additional times at the start of
+the program; there can then be steady-state exections of source,
+averager, printer. The StreamIt compiler handles this automatically.
+While all of the examples so far have had filters with matched I/O
+rates, the compiler also automatically schedules the execution of
+adjacent filters whose push and pop rates are different.<BR>
+<BR>
+
+<!--TOC subsection A Low-Pass Filter-->
+
+<H3><A NAME="htoc5">2.3</A>&nbsp;&nbsp;A Low-Pass Filter</H3><!--SEC END -->
+<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>float-&gt;float&nbsp;filter&nbsp;LowPassFilter(float&nbsp;rate,&nbsp;float&nbsp;cutoff,</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;taps,&nbsp;int&nbsp;decimation)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;float[taps]&nbsp;coeff;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;init&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;i;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;float&nbsp;m&nbsp;=&nbsp;taps&nbsp;-&nbsp;1;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;float&nbsp;w&nbsp;=&nbsp;2&nbsp;*&nbsp;pi&nbsp;*&nbsp;cutoff&nbsp;/&nbsp;rate;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(i&nbsp;=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;taps;&nbsp;i++)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(i&nbsp;-&nbsp;m/2&nbsp;==&nbsp;0)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;coeff[i]&nbsp;=&nbsp;w/pi;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;coeff[i]&nbsp;=&nbsp;sin(w*(i-m/2))&nbsp;/&nbsp;pi&nbsp;/&nbsp;(i-m/2)&nbsp;*</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(0.54&nbsp;-&nbsp;0.46&nbsp;*&nbsp;cos(2*pi*i/m));</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;1+decimation&nbsp;push&nbsp;1&nbsp;peek&nbsp;taps&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;float&nbsp;sum&nbsp;=&nbsp;0;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;taps;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sum&nbsp;+=&nbsp;peek(i)&nbsp;*&nbsp;coeff[i];</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(sum);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i=0;&nbsp;i&lt;decimation;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+The work function for a low-pass filter looks much like the work
+function of the moving-average filter; however, it has extensive
+initialization code. From the sampling rate, cutoff frequency, and
+number of taps, coefficients for an FIR filter can be statically
+calculated. This is done once, in the init function, and saved in the
+<CODE>coeff</CODE> array; the work function then effectively does a
+convolution. StreamIt provides a number of built-in mathematical
+functions, such as the call to <CODE>sin()</CODE> here, along with
+the constant <CODE>pi</CODE>.<BR>
+<BR>
+StreamIt's array syntax is more C-like than Java-like. Every array
+has a fixed length; this length can be a numeric constant or stream
+parameter, or other value that can be statically evaluated. In the
+declaration syntax, the length of the array comes between the base
+type and the variable name.<BR>
+<BR>
+The coefficient array here is defined as a <EM>field</EM> in the
+filter. If the name <CODE>coeff</CODE> were used as a local variable
+in the init or work function, it would shadow the field, as in other
+languages. Otherwise, uses in both the init and work functions
+reference the field. If multiple low-pass filters existed, each would
+have its own coefficient array.
+
+<!--TOC subsection A Band-Pass Filter-->
+
+<H3><A NAME="htoc6">2.4</A>&nbsp;&nbsp;A Band-Pass Filter</H3><!--SEC END -->
+
+<IMG SRC="cookbook004.png">
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>float-&gt;float&nbsp;pipeline&nbsp;BandPassFilter</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;(float&nbsp;rate,&nbsp;float&nbsp;low,&nbsp;float&nbsp;high,&nbsp;int&nbsp;taps)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;BPFCore(rate,&nbsp;low,&nbsp;high,&nbsp;taps);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;Subtracter();</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT>float-&gt;float&nbsp;splitjoin&nbsp;BPFCore</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;(float&nbsp;rate,&nbsp;float&nbsp;low,</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;float&nbsp;high,&nbsp;int&nbsp;taps)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;split&nbsp;duplicate;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;LowPass(rate,&nbsp;low,&nbsp;taps,&nbsp;0);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;LowPass(rate,&nbsp;high,&nbsp;taps,&nbsp;0);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;join&nbsp;roundrobin;</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT>float-&gt;float&nbsp;filter&nbsp;Subtracter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;2&nbsp;push&nbsp;1&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(peek(1)&nbsp;-&nbsp;peek(0));</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pop();&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+We implement a band-pass filter using two low-pass filters in a
+StreamIt structure called a <EM>split-join</EM>. This structure
+contains a <EM>splitter</EM>, some number of children that run in
+parallel, and a <EM>joiner</EM>. It overall has a single input and a
+single output, and its children each have a single input and a single
+output.<BR>
+<BR>
+This split-join has a duplicating splitter; thus, each incoming item
+is sent to both of the children. The joiner is a round-robin joiner,
+such that outputs are taken from the first child, then the second, in
+alternating order. There may be any number of children, in which case
+a round-robin joiner takes inputs from each of them in series. The
+order of the children is the order in which they are added.<BR>
+<BR>
+<CODE>roundrobin</CODE> can be used as a splitter, as well as a joiner;
+the meaning is symmetric. Other syntaxes are valid:
+<CODE>roundrobin(2)</CODE> reads two inputs from each child in turn,
+and <CODE>roundrobin(1,2,1)</CODE> requires exactly three children and
+reads one input from the first, two from the second, and one from the
+third.<BR>
+<BR>
+A typical use of a split-join is to duplicate the input, perform some
+computation, and then combine the results. In this case, the desired
+output is the difference between the two filters; the
+<CODE>Subtracter</CODE> filter is placed in a pipeline after the
+split-join, and finds the desired difference. In general, a child can
+be any StreamIt construct, not just a filter.<BR>
+<BR>
+The implementation of <CODE>pop()</CODE> in the compiler and runtime
+system does not allow multiple pops to occur in the same statement.
+This is reflected in the implementation of <CODE>Subtracter</CODE>
+here.
+<!--TOC subsection An Equalizer-->
+
+<H3><A NAME="htoc7">2.5</A>&nbsp;&nbsp;An Equalizer</H3><!--SEC END -->
+<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>float-&gt;float&nbsp;pipeline&nbsp;Equalizer(float&nbsp;rate,&nbsp;int&nbsp;bands,&nbsp;float[bands]&nbsp;cutoffs,</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;float[bands]&nbsp;gains,&nbsp;int&nbsp;taps)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;EqSplit(rate,&nbsp;bands,&nbsp;cutoffs,&nbsp;gains,&nbsp;taps);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;float-&gt;float&nbsp;filter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;work&nbsp;pop&nbsp;bands-1&nbsp;push&nbsp;1&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;float&nbsp;sum&nbsp;=&nbsp;0;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;bands-1;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sum&nbsp;+=&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;push(sum);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;};</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT>float-&gt;float&nbsp;splitjoin&nbsp;EqSplit(float&nbsp;rate,&nbsp;int&nbsp;bands,&nbsp;float[bands]&nbsp;cutoffs,</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;float[bands]&nbsp;gains,&nbsp;int&nbsp;taps)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;split&nbsp;duplicate;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;1;&nbsp;i&nbsp;&lt;&nbsp;bands;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;add&nbsp;pipeline&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add&nbsp;BandPassFilter(rate,&nbsp;cutoffs[i-1],&nbsp;cutoffs[i],&nbsp;taps);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;add&nbsp;float-&gt;float&nbsp;filter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;push&nbsp;1&nbsp;{&nbsp;push(pop()&nbsp;*&nbsp;gains[i]);&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;};</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;join&nbsp;roundrobin;</TT><TT><BR>
+</TT><TT>}</TT></DIV>
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+ <DIV ALIGN=center>
+ <IMG SRC="cookbook005.png">
+ <BR>
+<DIV ALIGN=center>Figure 2: Stream graph for an equalizer</DIV><BR>
+
+ <A NAME="fig:equalizer"></A>
+ </DIV>
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+This equalizer works by having a series of band-pass filters running
+in parallel, with their outputs added together. The caller provides
+arrays of cutoff frequency and respective gains.<BR>
+<BR>
+In the implmentation here, the output of <CODE>EqSplit</CODE> is a
+series of <CODE>bands-1</CODE> outputs from the respective low-pass
+filters. An <EM>inline filter</EM> is used to sum the results
+together. This is akin to an anonymous class in Java; the filter
+declaration does not have an explicit name, but otherwise has syntax
+almost identical to a top-level filter. In general, inline filters
+should only be used for very simple filters, such as this or the
+inlined amplifier in <CODE>EqSplit</CODE>.<BR>
+<BR>
+<CODE>EqSplit</CODE> is a normal split-join, as shown previously. Its
+body consists of a set of near-identical inlined pipelines; for
+pipelines and split-joins, the input and output type declarations may
+be omitted on anonymous streams. Since the children are so similar,
+they are added within a normal <CODE>for</CODE> loop. The compiler is
+able to examine the loop provided that the loop bounds are expressions
+of constants and stream parameters.
+
+<!--TOC subsection An Echo-->
+
+<H3><A NAME="htoc8">2.6</A>&nbsp;&nbsp;An Echo</H3><!--SEC END -->
+
+<IMG SRC="cookbook006.png">
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>float-&gt;float&nbsp;feedbackloop&nbsp;Echo</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;(int&nbsp;n,&nbsp;float&nbsp;f)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;join&nbsp;roundrobin(1,1);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;body&nbsp;FloatAdderBypass();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;loop&nbsp;float-&gt;float&nbsp;filter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;push&nbsp;1&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;push(pop()&nbsp;*&nbsp;f);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;};</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;split&nbsp;roundrobin;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;n;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;enqueue(0);</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT>float-&gt;float&nbsp;filter&nbsp;FloatAdderBypass&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;2&nbsp;push&nbsp;2&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(peek(0)&nbsp;+&nbsp;peek(1));</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(peek(0));</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+This example uses a StreamIt <EM>feedback loop</EM> to implement an echo
+effect. In a sense, a feedback loop is like an inverted split-join:
+it has a joiner at the top and a splitter at the bottom. A feedback
+loop has exactly two children, which are added using the <CODE>body</CODE>
+and <CODE>loop</CODE> statements. Thus, this implementation takes an
+input from the loop input and an input from the feedback path, adds
+them, and outputs the result. The result is also scaled by the value
+<CODE>f</CODE> and sent back to the top of the loop.<BR>
+<BR>
+Feedback loops have a specialized push-like statement,
+<CODE>enqueue</CODE>. Each enqueue statement pushes a single value on
+to the input to the joiner from the feedback path. There must be
+enough values enqueued to prevent deadlock of the loop components;
+values enqueued delay data from the feedback path.<BR>
+<BR>
+
+<!--TOC subsection Fibonacci-->
+
+<H3><A NAME="htoc9">2.7</A>&nbsp;&nbsp;Fibonacci</H3><!--SEC END -->
+<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>void-&gt;int&nbsp;feedbackloop&nbsp;Fib&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;join&nbsp;roundrobin(0,1);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;body&nbsp;int-&gt;int&nbsp;filter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;push&nbsp;1&nbsp;peek&nbsp;2&nbsp;{&nbsp;push(peek(0)&nbsp;+&nbsp;peek(1));&nbsp;pop();&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;};</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;loop&nbsp;Identity&lt;int&gt;;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;split&nbsp;duplicate;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;enqueue(0);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;enqueue(1);</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+Using a feedback loop for a Fibonacci number generator is slightly
+unusual but possible. The joiner reads no items from the stream input
+(also declared of type <CODE>void</CODE>), but reads items continuously
+from the feedback path. Within a feedback loop, round-robin splitters
+and joiners address the external path first and the feedback path
+second. This loop also uses the special <CODE>Identity</CODE> filter
+on the loop path; this is equivalent to an empty filter that copies
+its input to its output, but occurs frequently enough that a shorthand
+is useful to both the programmer and the compiler.<BR>
+<BR>
+<BR>
+<BR>
+<!--TOC section Using the StreamIt Compiler-->
+
+<H2><A NAME="htoc10">3</A>&nbsp;&nbsp;Using the StreamIt Compiler</H2><!--SEC END -->
+
+<A NAME="sec:compiler"></A>
+
+
+
+This section walks through a sample session with the compiler and
+runtime system. We will use the <TT>FMRadio</TT> example from the
+StreamIt release as a running example. To get started, change to the
+following directory:
+<PRE>
+% cd $STREAMIT_HOME/apps/examples/cookbook
+</PRE>
+The example is in <TT>FMRadio.str</TT>. The following
+sections describe the compilation of <TT>FMRadio</TT> using the
+uniprocessor backend, the cluster/multicore backend, and the Java
+library. A summary of the compiler's command-line options can be
+found in Appendix&nbsp;<A HREF="#ap:options">B</A>, or by typing <TT>strc -help</TT> at
+the command line.<BR>
+<BR>
+<!--TOC subsection Compiling for a Uniprocessor-->
+
+<H3><A NAME="htoc11">3.1</A>&nbsp;&nbsp;Compiling for a Uniprocessor</H3><!--SEC END -->
+
+There are two ways to compile a StreamIt program for execution on a
+general-purpose processor. The first method (the default) compiles to
+a set of C++ files, which are linked against a StreamIt runtime
+library. It uses the same infrastructure as our cluster backend and
+supports the full suite of StreamIt features and optimizations. The
+second method (invoked with the <TT>-simpleC</TT> option) emits a
+standalone C file in which the entire program is inlined into a single
+function. The simpleC backend is not fully featured<SUP><A NAME="text2" HREF="#note2"><FONT SIZE=2>2</FONT></A></SUP> but the output is readable and the C interface may be
+useful for some compiler projects. As we recommend using the default
+backend, we focus on it for the remainder of this section.<BR>
+<BR>
+To compile <TT>FMRadio</TT> using the uniprocessor backend, issue the
+following command (the compiler output is shown): 
+<PRE>
+% strc FMRadio.str -o fm
+Starting Kopi2SIR... done.
+Entry to Cluster Backend (uniprocessor)
+Running Constant Prop and Unroll... done.
+Running Constant Field Propagation... done.
+Estimating Code size of Filters... done.
+Estimating Code size of Filters... done.
+Running Partitioning... target number of threads: 1
+Done Partitioning...
+Generating cluster code...
+Done generating cluster code.
+gcc34 -O3 -I/u/thies/research/streams/streams/library/cluster 
+      -c -o combined_threads.o combined_threads.cpp
+gcc34 -O3 -o fm combined_threads.o 
+      -L/u/thies/research/streams/streams/library/cluster 
+      -lpthread -lcluster -lstdc++
+</PRE>
+This will create a number of threadXX.cpp files, one for each filter,
+splitter, and joiner in the original program. The files are
+concatenated into a single file (combined_threads.cpp) and compiled to
+create a binary named <TT>fm</TT>. The binary can be executed for 5
+steady-state iterations as follows: 
+<PRE>
+% ./fm -i 5
+278073.968750
+278074.750000
+278075.406250
+278075.968750
+278076.437500
+</PRE> 
+During the compilation process, several <TT>dot</TT> graphs are
+generated. The <TT>dot</TT> format can be displayed and converted to
+other formats using the Graphviz software, which is available
+online<SUP><A NAME="text3" HREF="#note3"><FONT SIZE=2>3</FONT></A></SUP>.
+For example, we can examine a stream graph for the FM application as
+follows: <PRE>
+% dotty stream-graph-simple.dot
+</PRE> 
+The result appears in Figure&nbsp;<A HREF="#fig:fm-sir-tree">3</A>. A complete list
+of the <TT>dot</TT> graphs that are produced on the normal uniprocessor
+path are shown in Figure&nbsp;<A HREF="#fig:dot-uni">4</A>.
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+figure=fm-sir-tree.eps,width=6.6in
+<BR>
+<DIV ALIGN=center>Figure 3: <TT>stream-graph-simple.dot</TT> for the FMRadio example.<A NAME="fig:fm-sir-tree"></A></DIV><BR>
+
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+<TABLE BORDER=1 CELLSPACING=0 CELLPADDING=1>
+<TR><TD ALIGN=left NOWRAP><B>Filename</B></TD>
+<TD ALIGN=left NOWRAP><B>Description</B></TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>stream-graph-simple.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inOriginal stream graph, as written by programmer.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>stream-graph.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inOriginal stream graph, including I/O rates.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>after-collapse-sjs.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inPartial canonicalization of stream graph, after collapsing data parallelism in the application. (The parallelism can be restored if needed.)</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>canonical-graph.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inCanonical version of stream graph, after further eliminating unneeded synchronization.</TD>
+</TR></TABLE>
+
+
+<BR>
+<DIV ALIGN=center>Figure 4: Notable <TT>dot</TT> graphs produced on the uniprocessor path.<A NAME="fig:dot-uni"></A></DIV><BR>
+
+
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+<BR>
+<B>Domain-specific optimizations.</B> It turns out that our
+version of the FMRadio has a lot of redundant computation the way in
+which it is written. For example, each <TT>BandPassFilter</TT> could be
+implemented as a single FIR filter rather than a composition of <TT>LowPassFilter</TT>'s; in fact, the entire equalizer could be collapsed to
+a single FIR filter. Further, some of these operations are more
+efficient if executed in the frequency domain, with an FFT/IFFT being
+used to translate to and from the time domain.<BR>
+<BR>
+The StreamIt compiler includes a set of domain-specific optimizations
+that will automatically perform the transformations described above.
+The analysis considers all filters that are ``linear''---that is, each
+of their outputs is an affine combination of their inputs. The
+compiler automatically detects linear filters by analyzing the code in
+their work functions. Then, it performs algebraic simplification of
+adjacent linear filters, as well as automatic translation to the
+frequency domain. Since these transformations can sometimes hamper
+performance, the compiler also does a global cost/benefit analysis to
+determine the best set of transformations for a given stream graph.
+<BLOCKQUOTE><DIV ALIGN=center><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+figure=fm-linear-simple.eps,width=@percent
+<BR>
+<DIV ALIGN=center>Figure 5: <TT>linear-simple.dot</TT>, which illustrates the linear sections of FMRadio. Linear filters are shaded blue, while linear containers are shaded pink.<A NAME="fig:fm-linear-simple"></A></DIV><BR>
+
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></DIV></BLOCKQUOTE>
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+
+<DIV ALIGN=center>
+figure=fm-after-linear.eps,width=2.5in
+
+<BR>
+<DIV ALIGN=center>Figure 6: Final stream graph (<TT>after-linear.dot</TT>) for the FMRadio, compiling with the <TT>-linearpartition</TT> option.<A NAME="fig:fm-after-linear"></A></DIV><BR>
+
+</DIV>
+
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+The <TT>linearpartition</TT> option to strc will enable linear analysis
+and optimizations<SUP><A NAME="text4" HREF="#note4"><FONT SIZE=2>4</FONT></A></SUP>:
+<PRE>
+% strc -linearpartition FMRadio.str -o fm
+Starting Kopi2SIR... done.
+Entry to Cluster Backend (uniprocessor)
+Running Constant Prop and Unroll... done.
+Running Constant Field Propagation... done.
+Estimating Code size of Filters... done.
+Running linear analysis... 
+WARNING: Assuming method call expression non linear(atan). 
+         Also removing all field mappings.
+done with linear analysis.
+Running linear partitioner...
+Linear partitioner took 0 secs to calculate partitions.
+Estimating Code size of Filters... done.
+Running Partitioning... target number of threads: 1
+Done Partitioning...
+Generating cluster code...
+Done generating cluster code.
+gcc34 -O3 -I/u/thies/research/streams/streams/library/cluster 
+      -c -o combined_threads.o combined_threads.cpp
+gcc34 -O3 -o fm combined_threads.o 
+      -L/u/thies/research/streams/streams/library/cluster 
+      -lpthread -lcluster -lstdc++ -lsrfftw -lsfftw
+</PRE> 
+The linear analysis produces its own set of <TT>dot</TT> files that we
+can use to inspect the results of the optimizations. For example, the
+following command will display the stream graph with the linear
+sections highlighted: <PRE>
+% dotty linear-simple.dot
+</PRE> 
+As shown in Figure&nbsp;<A HREF="#fig:fm-linear-simple">5</A>, FMRadio contains many
+linear components, including the first LowPassFilter and the
+equalizer. To see the stream graph after linear optimizations have
+been applied, we can issue the following command:
+<PRE>
+% dotty after-linear.dot
+</PRE> 
+As illustrated in Figure&nbsp;<A HREF="#fig:fm-after-linear">6</A>, this stream
+graph shows that the equalizer was collapsed into a single filter and
+then was translated to the frequency domain (by virtue of the ``Freq''
+prefix in the filter's name.) However, the LowPassFilter at the top
+was left unmodified; this is because it has a large pop rate that
+degrades the performance of the frequency transformation. In this
+case, the linear optimizations lead to a 6.7X improvement in
+throughput.<BR>
+<BR>
+The linear optimizations produce additional <TT>dot</TT> graphs; see
+Figure&nbsp;<A HREF="#fig:dot-linear">7</A> for details. For more information on the
+linear analysis and optimization, please refer to <TT>http://cag.lcs.mit.edu/linear</TT>.
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+
+<TABLE BORDER=1 CELLSPACING=0 CELLPADDING=1>
+<TR><TD ALIGN=left NOWRAP><B>Filename</B></TD>
+<TD ALIGN=left NOWRAP><B>Description</B></TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>linear-simple.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inStream graph with linear filters highlighted.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>linear.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inSame as linear-simple, but including I/O rates of each node.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>linear-partitions.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inIllustration of which nodes are combined by linear optimizations.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>after-linear.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inThe stream graph after linear transformations are complete.</TD>
+</TR></TABLE>
+
+
+<BR>
+<DIV ALIGN=center>Figure 7: <TT>dot</TT> graphs produced by linear optimizations.<A NAME="fig:dot-linear"></A></DIV><BR>
+
+
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+<!--TOC subsection Compiling for a Cluster or Multicore-->
+
+<H3><A NAME="htoc12">3.2</A>&nbsp;&nbsp;Compiling for a Cluster or Multicore</H3><!--SEC END -->
+
+The <TT>-cluster N</TT> option selects a backend that compiles to N
+parallel threads that communicate using sockets. When targeting a
+cluster of workstations, the sockets communicate over the network
+using TCP/IP. When targeting a multicore architecture, the sockets
+provide an interface to shared memory. A hybrid setup is also
+possible, in which there are multiple machines and multiple threads
+per machine; some threads communicate via memory, while others
+communicate over the network.<BR>
+<BR>
+<!--TOC subsubsection Multicores-->
+
+<H4><A NAME="htoc13">3.2.1</A>&nbsp;&nbsp;Multicores</H4><!--SEC END -->
+
+By default, the StreamIt compiler will map all of the threads to the
+current host (i.e., the one that issued the compile command). This is
+suitable for multicores, as running the resulting executable will
+spawn the threads on a single machine.<BR>
+<BR>
+For example, consider compiling the FMRadio to eight parallel threads:
+<PRE>
+% strc -cluster 8 FMRadio.str -o fm
+Starting Kopi2SIR... done.
+Entry to Cluster Backend
+Running Constant Prop and Unroll... done.
+Running Constant Field Propagation... done.
+Estimating Code size of Filters... done.
+Estimating Code size of Filters... done.
+Running Partitioning... target number of threads: 8
+Running Partitioning... target number of threads: 8
+  Found 0 tiles.
+  Building stream config...
+Trying 8 tiles.
+  Calculating partition info...
+  Tracing back...
+  Work Estimates:
+    Fused_SplitJoin0_EqSplit_81...      1545    (21%)
+    Fused_SplitJoin0_EqSplit_81...      1545    (21%)
+    Fused_SplitJoin0_EqSplit_81...      1545    (21%)
+    Fused_SplitJoin0_EqSplit_81...      1545    (21%)
+    LowPassFilter__13                   730     (10%)
+    FMDemodulator__17                   221     (3%)
+    Fused_Spl_Ano_Flo                   89      (1%)
+    FloatOneSource__3                   35      (0%)
+  Building stream config...
+Trying 8 tiles.
+  Calculating partition info...
+  Tracing back...
+Done Partitioning...
+Generating cluster code...
+NOTE: Missing or empty $STREAMIT_HOME/cluster-machines.txt file,
+  so all threads assigned to cagfarm-49 in cluster-config.txt.
+Done generating cluster code.
+gcc34 -O3 -I/u/thies/research/streams/streams/library/cluster 
+      -c -o combined_threads.o combined_threads.cpp
+gcc34 -O3 -o fm combined_threads.o 
+      -L/u/thies/research/streams/streams/library/cluster 
+      -lpthread -lcluster -lstdc++
+</PRE>
+The compiler used a partitioning algorithm to fuse filters in the
+graph down to eight load-balanced units. The stream graph following this
+partitioning can be found in <TT>after-partition.dot</TT>:
+<PRE>
+% dotty after-partition.dot
+</PRE>
+The result appears in Figure&nbsp;<A HREF="#fig:after-partition">9</A>. The array of
+eight low-pass filters was collapsed to a width of four, and the
+bottom half of the application (Subtracter, Amplify, Printer filters)
+was fused into a single filter. The other auto-generated files
+provide more information about the distribution of work amongst these
+filters; see Figure&nbsp;<A HREF="#fig:dot-cluster">8</A> for details.
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+<TABLE BORDER=1 CELLSPACING=0 CELLPADDING=1>
+<TR><TD ALIGN=left NOWRAP><B>Filename</B></TD>
+<TD ALIGN=left NOWRAP><B>Description</B></TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>before-partition.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inStream graph before partitioning into requested number of threads.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>after-partition.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inStream graph after partitioning into requested number of threads.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>work-before-partition.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[42pt][36pt]2.75inThe stream graph before partitioning, annotated with estimates of the steady-state work within each node. Nodes with the same amount of work are given the same color (although the colors themselves are meaningless.)</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>work-before-partition.txt</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inText listing of the work estimates for filters in the graph, before load balancing.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>work-after-partition.dot</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inThe stream graph after partitioning, annotated with work estimates as above.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>work-after-partition.txt</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inText listing of the work estimates for filters in the graph, after load balancing.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>work-estimate.txt</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inSame as above, but indexed by the thread numbers in cluster-config.txt.</TD>
+</TR>
+<TR><TD ALIGN=left NOWRAP><TT>cluster-config.txt</TT></TD>
+<TD ALIGN=left NOWRAP>0pt[24pt][20pt]2.75inMapping from threads to machines.</TD>
+</TR></TABLE>
+
+
+<BR>
+<DIV ALIGN=center>Figure 8: Files produced by the cluster/multicore backend, above and beyond those produced by the uniprocessor backend.<A NAME="fig:dot-cluster"></A></DIV><BR>
+
+
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+Running the <TT>fm</TT> binary will spawn all eight threads on the
+current host.
+<BLOCKQUOTE><DIV ALIGN=center><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+figure=fm-after-partition.eps,width=@percent
+<BR>
+<DIV ALIGN=center>Figure 9: The FMRadio example partitioned to eight threads (<TT>after-partition.dot</TT>).<A NAME="fig:after-partition"></A></DIV><BR>
+
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></DIV></BLOCKQUOTE>
+<!--TOC subsubsection Cluster of Workstations-->
+
+<H4><A NAME="htoc14">3.2.2</A>&nbsp;&nbsp;Cluster of Workstations</H4><!--SEC END -->
+
+In order to compile for a cluster of workstations, one should create a
+list of available machines and store it in the following location:
+<PRE>
+$STREAMIT_HOME/cluster-machines.txt
+</PRE>This file should contain one machine name (or IP address) per line.
+When the compiler generates N threads, it will assign one thread per
+machine (for the first N machines in the file). If there are fewer
+than N machines available, it will distribute the threads across the
+machines.<BR>
+<BR>
+For example, consider that our <TT>cluster-machines.txt</TT> file
+contains the following:
+<PRE>
+machine-1
+machine-2
+machine-3
+machine-4
+</PRE>
+Let's say that each machine is a dual-processor, so we again compile
+FMRadio for eight threads as shown previously. The resulting mapping
+from threads to machines can be found in <TT>cluster-config.txt</TT>:
+<PRE>
+% strc -cluster 8 FMRadio.str -o fm
+...
+% cat cluster-config.txt
+0 machine-1
+1 machine-1
+2 machine-1
+3 machine-2
+4 machine-2
+5 machine-2
+6 machine-3
+7 machine-3
+8 machine-4
+9 machine-4
+</PRE>
+This file indicates that threads 0, 1, and 2 are mapped to machine-1;
+threads 3, 4, and 5 are mapped to machine-2, and so on. The
+cluster-config file contains 10 threads (rather than eight) because a
+thread is also generated for each splitter and joiner in the stream
+graph. However, as these threads rarely do as much work as the
+filters, it is not detrimental for a processor to acquire them.<BR>
+<BR>
+To execute the program on the cluster, one should run the <TT>fm</TT>
+executable from each machine that is assigned one or more threads.
+Each instance of the program will wait until all of its network
+connections are established before starting to process data. To
+measure performance, a built-in timer keeps track of the elapsed time
+after the connections are made.<BR>
+<BR>
+As the cluster-config file is read at application load time, one can
+freely modify it to experiment with various layouts or to move the
+program from one cluster to another. Mapping all the threads to a
+single machine will have the same effect as compiling to a multicore
+(as described previously).<BR>
+<BR>
+<!--TOC subsection Using the Java Library-->
+
+<H3><A NAME="htoc15">3.3</A>&nbsp;&nbsp;Using the Java Library</H3><!--SEC END -->
+
+A convenient aspect of the StreamIt compilation toolchain is that all
+StreamIt programs are first translated to Java files that can be
+executed against a Java runtime library using a normal Java Virtual
+Machine. This is especially useful for testing and debugging
+applications, as well as validating the output of the compiler.<BR>
+<BR>
+The library can be invoked with the <TT>-library</TT> flag. Since <TT>strc</TT> will both compile and execute the file in the library, you can
+specify the number of iterations to execute with the <TT>-i</TT> flag.
+For example, to compile FMRadio and run for 5 iterations in the
+library, do as follows<SUP><A NAME="text5" HREF="#note5"><FONT SIZE=2>5</FONT></A></SUP>:
+<PRE>
+% strc -library -i 5 FMRadio.str
+278073.94
+278074.75
+278075.38
+278075.94
+278076.4
+</PRE> 
+You can also inspect the <TT>FMRadio.java</TT> file, which was generated
+for execution in the library. It can be compiled and run with a
+standard Java compiler and JVM. The library also produces a <TT>dot</TT>
+graph of the program; it is given the same name as the StreamIt file,
+but with a <TT>dot</TT> extension (<I>i.e.,</I> it is <TT>FMRadio.dot</TT> in
+this case.)<BR>
+<BR>
+There are a few additional options available in the library. For
+instance, you can direct the library not to execute the program, but
+to instead just print the schedule of filter firings: 
+<PRE>
+% strc -library -norun -printsched FMRadio.str
+init = [
+$0 = FloatOneSource@1.work
+$1 = LowPassFilter@4.work
+$2 = FMDemodulator@5.work
+$3 = EqSplit@8.streamit.misc.Pair@1386000
+$4 = BPFCore@16.streamit.misc.Pair@a470b8
+$5 = BPFCore@24.streamit.misc.Pair@cdedfd
+$6 = BPFCore@32.streamit.misc.Pair@116471f
+$7 = BPFCore@40.streamit.misc.Pair@12558d6
+$8 = { {379 $0} {64 $1} {63 $2} {63 $3} {63 $4} {63 $5} 
+       {63 $6} {63 $7} }
+]
+steady = [
+$9 = LowPassFilter@18.work
+$10 = LowPassFilter@19.work
+$11 = BPFCore@16.streamit.misc.Pair@18e2b22
+$12 = Subtracter@17.work
+$13 = Amplify@15.work
+$14 = LowPassFilter@26.work
+$15 = LowPassFilter@27.work
+$16 = BPFCore@24.streamit.misc.Pair@bf2d5e
+$17 = Subtracter@25.work
+$18 = Amplify@23.work
+$19 = LowPassFilter@34.work
+$20 = LowPassFilter@35.work
+$21 = BPFCore@32.streamit.misc.Pair@1ee3914
+$22 = Subtracter@33.work
+$23 = Amplify@31.work
+$24 = LowPassFilter@42.work
+$25 = LowPassFilter@43.work
+$26 = BPFCore@40.streamit.misc.Pair@12a54f9
+$27 = Subtracter@41.work
+$28 = Amplify@39.work
+$29 = EqSplit@8.streamit.misc.Pair@1662dc8
+$30 = AnonFilter_a0@9.work
+$31 = FloatPrinter@3.work
+$32 = { {5 $0} $1 $2 $3 $4 $9 $10 $11 $12 $13 $5 $14 
+        $15 $16 $17 $18 $6 $19 $20 $21 $22 $23 $7 
+        $24 $25 $26 $27 $28 $29 $30 $31 }
+]
+!ml sched size = 39
+!ml buff size = 1299
+</PRE> 
+Currently, the default scheduler is a minimal latency scheduler that
+uses phases to compress the code size. The schedule listed above has
+two components: an initialization schedule (to initialize buffers for
+filters that peek) and a steady-state schedule (that can loop
+infinitely). Each filter and splitter in the graph is given a number
+for easy reference, and then the schedule is printed at the bottom. A
+loop nest in the schedule is denoted by <TT>(N F)</TT>, where the filter
+<TT>F</TT> executes <TT>N</TT> times. The schedule size and buffer size
+required are printed at the end of the listing.<BR>
+<BR>
+Additional options for the library can be found in
+Appendix&nbsp;<A HREF="#ap:options">B</A>.<BR>
+<BR>
+<BR>
+<BR>
+<!--TOC section Keyword Review-->
+
+<H2><A NAME="htoc16">A</A>&nbsp;&nbsp;Keyword Review</H2><!--SEC END -->
+
+Stream object types:
+<DL COMPACT=compact><DT>
+<B>filter</B><DD> Declares a filter with a work function
+<DT><B>pipeline</B><DD> Declares a series of stream objects, with the output
+ of the first connected to the input of the second, etc.
+<DT><B>splitjoin</B><DD> Declares a parallel set of stream objects, with a
+ splitter and a joiner distributing and collecting data
+<DT><B>feedbackloop</B><DD> Declares a feedback loop with two children, with a
+ joiner combining input data and the output of the loop and a
+ splitter distributing the output of the body to the output and the
+ input of the loop
+</DL>
+Filter work or helper functions:
+<DL COMPACT=compact><DT>
+<B>push</B><DD> Pushes an item on to the output of the filter. Must be
+ called the exact number of times as in the rate declaration.
+<DT><B>pop</B><DD> Retrieves and removes the first item from the input of the
+ filter. Must be called the exact number of times as in the rate
+ declaration.
+<DT><B>peek(k)</B><DD> Retrieves the <I>k</I>+1-th item from the input of the
+ filter, without removing it. If <I>n</I> items have been popped, <I>k</I>+<I>n</I>
+ must be less than the declared peek rate.
+</DL>
+Composite stream declarations:
+<DL COMPACT=compact><DT>
+<B>add</B><DD> Adds a child after the existing children. (pipeline,
+ splitjoin)
+<DT><B>body</B><DD> Adds a child as the body part of a feedback loop.
+<DT><B>loop</B><DD> Adds a child as the loop part of a feedback loop.
+<DT><B>enqueue</B><DD> Pushes an item on to the input of the joiner coming
+ from the loop part of a feedback loop.
+<DT><B>split</B><DD> Declares the type and weights of the splitter.
+ (splitjoin, feedbackloop)
+<DT><B>join</B><DD> Declares the type and weights of the joiner. (splitjoin,
+ feedbackloop)
+<DT><B>duplicate</B><DD> Splitter type that takes each input item and copies
+ it to the input of each child.
+<DT><B>roundrobin</B><DD> Splitter or joiner type that takes a specified
+ number of items from the input (or output) and copies it to the
+ input (or output) of each child.
+</DL>
+<!--TOC section Options-->
+
+<H2><A NAME="htoc17">B</A>&nbsp;&nbsp;Options</H2><!--SEC END -->
+
+<A NAME="ap:options"></A>
+
+
+<DL COMPACT=compact><DT>
+<B>--help</B><DD>
+Displays a summary of common options.<BR>
+<BR>
+<DT><B>--more-help</B><DD> 
+Displays a summary of advanced options (which are not described below).<BR>
+<BR>
+<DT><B>--cluster &lt;<EM>n</EM>&gt;</B><DD>
+Compile for a cluter or multicore with &lt;<EM>n</EM>&gt; nodes.<BR>
+<BR>
+<DT><B>--library</B><DD>
+Produce a Java file compatible with the StreamIt Java library,
+and compile and run it.<BR>
+<BR>
+<DT><B>--simpleC</B><DD>
+Generate a simple C file that inlines the entire application into a
+single function. This is sometimes more readable than the default
+uniprocessor output, but the backend is not fully-featured.<BR>
+<BR>
+<DT><B>--raw &lt;<EM>n</EM>&gt;, -r &lt;<EM>n</EM>&gt;</B><DD>
+Compile for an &lt;<EM>n</EM>&gt;-by-&lt;<EM>n</EM>&gt; Raw processor.<BR>
+<BR>
+<DT><B>--rstream, -R</B><DD>
+Generate a C-like file to be compiled by the RStream compiler from
+Reservoir Labs.<BR>
+<BR>
+<DT><B>--output &lt;<EM>filename</EM>&gt;, -o &lt;<EM>filename</EM>&gt;</B><DD>
+Places the resulting binary in &lt;<EM>filename</EM>&gt;.<BR>
+<BR>
+<DT><B>--verbose</B><DD>
+Show intermediate commands as they are executed.
+</DL>
+<!--TOC subsection Options available for all backends-->
+
+<H3>Options available for all backends</H3><!--SEC END -->
+
+<DL COMPACT=compact><DT>
+<B>-O0</B><DD>
+Do not optimize (default).<BR>
+<BR>
+<DT><B>-O1</B><DD>
+Perform basic optimizations that should improve performance in most
+cases. Adds <TT>--unroll 16 --destroyfieldarray --partition --wbs</TT>.<BR>
+<BR>
+<DT><B>-O2</B><DD>
+Perform extended optimizations that should improve performance in
+most cases, but may also cause the compiler to become unstable.
+Adds <TT>--unroll 256 --destroyfieldarray --partition --wbs --macros</TT>.<BR>
+<BR>
+<DT><B>--iterations &lt;<EM>n</EM>&gt;, -i&lt;<EM>n</EM>&gt;</B><DD>
+Run the program for &lt;<EM>n</EM>&gt; steady-state iterations. Defaults to
+infinity. For the uniprocessor, cluster, and simpleC backends, the
+number of iterations can also be passed at the command line of the
+final executable (<TT>a.out -i 100</TT>).<BR>
+<BR>
+<DT><B>--linearreplacement</B><DD>
+Domain-specific optimization: combine adjacent ``linear'' filters in
+the program into a single matrix multiplication operation wherever
+possible. Corresponds to the ``linear'' option in the PLDI'03 paper.<BR>
+<BR>
+<DT><B>--statespace</B><DD>
+In combination with <TT>--linearreplacement</TT>, performs combination
+and optimization of linear statespace filters as described in the
+CASES'05 paper.<BR>
+<BR>
+<DT><B>--unroll &lt;<EM>n</EM>&gt;, -u&lt;<EM>n</EM>&gt;</B><DD>
+Specify loop unrolling limit. The default value is 0.
+</DL>
+<!--TOC subsection Options specific to Uniprocessor and Cluster backends-->
+
+<H3>Options specific to Uniprocessor and Cluster backends</H3><!--SEC END -->
+
+<DL COMPACT=compact><DT><B>--cacheopt</B><DD>
+Performs cache optimizations as described in the LCTES'05 paper.<BR>
+<BR>
+<DT><B>--l1d &lt;<EM>n</EM>&gt;</B><DD>
+Sets the L1 data cache size (in KB) for cache optimizations. The
+default is 8 KB.<BR>
+<BR>
+<DT><B>--l1i &lt;<EM>n</EM>&gt;</B><DD>
+Sets the L1 instruction cache size (in KB) for cache optimizations.
+The default is 8 KB.<BR>
+<BR>
+<DT><B>--l2 &lt;<EM>n</EM>&gt;</B><DD>
+Sets the L2 cache size (in KB) for cache optimizations (we assume a
+unified L2 cache). The default is 256 KB.<BR>
+<BR>
+<DT><B>--linearpartition, -L</B><DD>
+Domain-specific optimization: perform linear replacement and frequency
+replacement selectively, based on an estimate of where it is most
+beneficial. Corresponds to the ``autosel'' option in the PLDI'03
+paper. (Relies on FFTW installation.)</DL>
+<!--TOC subsection Options specific to Raw backend-->
+
+<H3>Options specific to Raw backend</H3><!--SEC END -->
+
+<DL COMPACT=compact><DT>
+<B>--asciifileio</B><DD>
+Specifies that FileReader's and FileWriter's should use ASCII format
+rather than binary. Also works under the <TT>--simpleC</TT> backend.<BR>
+<BR>
+<DT><B>--numbers &lt;<EM>n</EM>&gt;, -N&lt;<EM>n</EM>&gt;</B><DD>
+Instrument code to gather performance statistics on simulated code
+over &lt;<EM>n</EM>&gt; steady-state cycles. The results are placed in
+<FONT COLOR=purple>results.out</FONT> in the current directory.<BR>
+<BR>
+<DT><B>--ssoutputs &lt;<EM>n</EM>&gt;</B><DD>
+For applications containing a dynamic I/O rate, this option indicates
+how many outputs should count as a steady-state when gathering numbers
+(with <TT>--numbers</TT>).<BR>
+<BR>
+<DT><B>--rawcol &lt;<EM>m</EM>&gt;, -c&lt;<EM>m</EM>&gt;</B><DD>
+Specify number of columns in Raw processor; --raw specifies number of rows.<BR>
+<BR>
+<DT><B>--wbs</B><DD> When laying out communication instructions, use the 
+work-based simulator to estimate exactly when items will be produced
+and consumed. This improves the scheduling of routing instructions.</DL>
+
+
+
+<!--BEGIN NOTES document-->
+<HR WIDTH="50%" SIZE=1><DL><DT><A NAME="note1" HREF="#text1"><FONT SIZE=5>1</FONT></A><DD><TT>http://www.graphviz.org/</TT>
+<DT><A NAME="note2" HREF="#text2"><FONT SIZE=5>2</FONT></A><DD>As of
+this release, simpleC lacks support for dynamic rates, teleport
+messaging, prework functions, general helper functions,
+domain-specific optimizations, cache optimizations, and other
+features.
+<DT><A NAME="note3" HREF="#text3"><FONT SIZE=5>3</FONT></A><DD><TT>http://www.graphviz.org/</TT>
+<DT><A NAME="note4" HREF="#text4"><FONT SIZE=5>4</FONT></A><DD>In contrast, the <TT>linearreplacement</TT>
+and <TT>frequencyreplacement</TT> options will perform maximal algebraic
+simplification and frequency translation, respectively, even in cases
+where it is not beneficial.
+<DT><A NAME="note5" HREF="#text5"><FONT SIZE=5>5</FONT></A><DD>In this case, the library's output is
+marginally different from the compiler's due to numerical precision
+issues.
+</DL>
+<!--END NOTES-->
+<!--HTMLFOOT-->
+<!--ENDHTML-->
+<!--FOOTER-->
+<HR SIZE=2>
+<BLOCKQUOTE><EM>This document was translated from L<sup>A</sup>T<sub>E</sub>X by
+</EM><A HREF="http://pauillac.inria.fr/~maranget/hevea/index.html"><EM>H<FONT SIZE=2><sup>E</sup></FONT>V<FONT SIZE=2><sup>E</sup></FONT>A</EM></A><EM>.
+</EM></BLOCKQUOTE>
+</BODY>
+</HTML>

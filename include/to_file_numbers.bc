@@ -1,0 +1,550 @@
+/* to_file
+ *
+ * streams values from a static network port to a file.
+ * makes use of the data_transmitter generic device.
+ *
+ * Michael Gordon
+ */
+
+//should we generate a blood graph?
+global generate_blood_graph = 0;
+
+//the blood graph variables
+global gPPMFILE;
+global gRedP;
+global gGreenP;
+global gBlueP;
+global gBloodCycles;
+global gTraceWidth = 7 + (64 / gNumProc);
+
+//for number gathering
+global gNGlastSteady = 0;
+global gNGisSteady = 0;
+//for deadlock detection
+global gDEADLOCK_COUNT = 100000;
+global gRegDLDet = 0;
+global gLastInsCycle = 0;
+//
+global gFpuCount = 0;
+global gMemCount = 0;
+global gBrCount = 0;
+global gAdminCount = 0;
+global gAluCount = 0;
+global gSSNumber = 0;
+global outputFile;
+global gTotalDif = 0;
+global gTotalOutputs = 0;
+global totalCycles = 0;
+global gFpuCountTotal = 0;
+global gWorkCount = 0;
+global gWorkCountTotal = 0;
+
+if (FindFunctionInSymbolHash(gSymbolTable, "dev_data_transmitter_init",3) == NULL)
+  include("<dev/data_transmitter.bc>");
+
+//open the file to dump the data to
+outputFile = fopen("results.out", "w");
+
+// instrumentation code
+fn screen(val, type, format, file_name) {
+  local a;
+  local b;
+  Proc_GetCycleCounter(Machine_GetProc(machine,0), &a, &b);
+  //printf("cycleHi %X, cycleLo %X\n", a, b);
+  printf("[%s at %d]: ", file_name, b);
+
+  if (type == 0)
+    printf(format, val);
+  else 
+    printf(format, double(val));
+
+  if (a != 0)
+    printf(" (Warning: cycle count overflow)");
+}
+
+
+/** call the below method and don't ignore the first word */
+fn dev_NG_to_file(id, filename, port, static_network, binary, type, size) {
+  dev_NG_to_file(id, filename, port, static_network, binary, type, size, 0);
+}
+
+/**
+ * static network = 1 for static net, 0 for gdn
+ * binary = 1 for binary, 0 for ascii
+ * type: 0 = int, 1 = float, can be extended
+ * size is number of bytes for each item received
+ */
+fn dev_NG_to_file(id, filename, port, static_network, binary, 
+		  type, size, ignore_first)
+{
+  local receive_device_descriptor = hms_new();
+  local cyclesPerWord = 1;
+  local i;
+  local network = 0;
+
+  //set the cycles per word based on the presence of this global variable
+  if (LookupSymbolHash(gSymbolTable, "gFileDevCyclesPerWord") != NULL) {
+    local cpw = 0;
+    cpw = LookupSymbolHash(gSymbolTable, "gFileDevCyclesPerWord");
+    cyclesPerWord = **(cpw);
+  }
+
+  if (static_network == 0)
+    network = 2;
+
+  printf(" ** File Writer on port %d with %d cycles per word.\n", 
+	 port, cyclesPerWord);
+    
+
+  // open the file
+  receive_device_descriptor.fileName = filename;
+  receive_device_descriptor.theFile = fopen(receive_device_descriptor.fileName,
+                                            "w");
+  receive_device_descriptor.format = "";
+  receive_device_descriptor.ioPort = port;
+  receive_device_descriptor.type = type;
+  receive_device_descriptor.id = id;
+  receive_device_descriptor.cyclesPerWord = cyclesPerWord;
+  receive_device_descriptor.ignore_first = ignore_first;
+  
+  if (type == 0)
+    receive_device_descriptor.format = "%d\n";
+  else if (type == 1)
+    receive_device_descriptor.format = "%f\n";
+  else {
+    printf("Invalid format arg passed to dev_to_file\n");
+    exit(-1);
+  }
+
+  for (i = 0; i < gNGfws; i++) {
+    gNGItems[i] = 0;
+  }
+
+  //set the printf format for ascii data
+  if (type == 0)
+    receive_device_descriptor.format = "%d\n";
+  else if (type == 1)
+    receive_device_descriptor.format = "%f\n";
+  else {
+    printf("Invalid format arg passed to dev_to_file\n");
+    exit(-1);
+  }
+
+  verify(receive_device_descriptor.theFile != NULL,
+         "### Failed to open output file\n");
+
+  if (static_network == 1) {
+    receive_device_descriptor.calc =
+      & fn(this)
+      {
+	local theFile = this.theFile;
+	local format = this.format;
+	local filename = this.fileName;
+	local ioPort = this.ioPort;
+	local type = this.type;
+	local id = this.id;
+	local cyclesPerWord = this.cyclesPerWord;
+	local ignore_first = this.ignore_first;
+
+        //ignore the first word
+	if (ignore_first == 1) {
+	  this.receive();
+	}
+
+	while (1)
+	{
+	  local value;
+
+	  limit_bandwidth(cyclesPerWord);
+	  
+	  value = this.receive();
+
+	  //write to file
+	  if (binary == 0 && type == 1)
+	    fprintf(theFile,format,double(value));
+	  else if (binary == 0 && type == 0)
+	    fprintf(theFile,format,value);
+	  else 
+	    fwrite(&value, size, 1, theFile);
+	  fflush(theFile);
+	  //update the number gathering statistics
+	  NG_numbers_record_item(id);
+
+	  //write to screen
+	  screen(value, type, format, filename);
+	}
+      }; 
+  }
+  else {
+    receive_device_descriptor.calc =
+      & fn(this)
+      {
+	local theFile = this.theFile;
+	local format = this.format;
+	local filename = this.fileName;
+	local ioPort = this.ioPort;
+	local type = this.type;
+	local id = this.id;
+	local cyclesPerWord = this.cyclesPerWord;
+	local ignore_first = this.ignore_first;
+
+        //ignore the first word
+	if (ignore_first == 1) {
+	  this.receive();
+	}
+
+	while (1)
+	{
+	  local value;
+	  local i, bogus, length, senderY, senderX, ourY, ourX, hdr;
+	  
+	  limit_bandwidth(cyclesPerWord);
+
+	  value = this.receive();
+
+	  DecodeDynHdr(value, &bogus, &length, &hdr,
+		       &senderY, &senderX, &ourY, &ourX);
+	  
+	  for (i = 0; i < length; i++) {
+	    limit_bandwidth(cyclesPerWord);
+	    value = this.receive();
+	    //write to the file
+	    if (binary == 1) 
+	      fwrite(&value, size, 1, theFile);
+	    else { //ascii, use type and format
+	      if (type == 1)
+		fprintf(theFile,format,double(value));
+	      else 
+		fprintf(theFile,format,value);
+	    }
+	    //flush and write to screen
+	    fflush(theFile);
+	    //update the number gathering statistics
+	    NG_numbers_record_item(id);
+	    screen(value, type, format, filename);
+	  }
+	}
+      };
+  }
+  return dev_data_transmitter_init("NG_to_file",
+				   port,
+				   0, //don't wait for static trigger 
+				   receive_device_descriptor, 
+				   network);
+}
+
+//need to define 
+//items to skip for each filewriter
+//items in the steady state for each file writer
+//total items received into each fw
+//is steady = 0
+//total number of fw
+
+fn NG_numbers_record_item(id) 
+{
+  //update the total number of item received into fw
+  gNGItems[id] += 1;
+  //see if we have executed a steady-state
+  NG_update();
+}
+
+fn NG_update() {
+  local i, time_hi, time_lo;
+  local proc = Machine_GetProc(machine, 0);
+  local dif, MFLOPS;
+  
+  if (gNGisSteady == 0) {
+    for (i = 0; i < gNGfws; i++) {
+      //make sure everyone is done the init/pp stage
+      if (gNGItems[i] < gNGskip[i]) {
+	return;
+      } 
+    }
+    //if we get here everyone is done with init/pp
+    //subtract the number to skip from init/pp from
+    //everyone's items
+    for (i = 0; i < gNGfws; i++) {
+      gNGItems[i] -= gNGskip[i];
+    }
+    //we are now in the steady state
+    gNGisSteady = 1;
+  } 
+  
+  if (gNGisSteady == 1) {
+//    printf("\n");
+    //in steady-state, check to see if
+    //have executed a full steady state
+    for (i = 0; i < gNGfws; i++) {
+      if (gNGItems[i] < gNGsteady[i]) {
+	//someone is still in the init/pp stage
+	return;
+      }
+    }
+    
+    //if we get here we have executed a full steady state
+    //first subtract from everyone's items
+    for (i = 0; i < gNGfws; i++) {
+      gNGItems[i] -= gNGsteady[i];
+    } 
+
+    //get the cycle
+    Proc_GetCycleCounter(proc, &time_hi, &time_lo);
+    
+    //next print what we want to print 
+    dif = time_lo - gNGlastSteady;
+    //MFLOPS = 0;
+    if (dif == 0) {
+      printf("\n** Error: SS cycle difference is zero\n");
+      //this should exit!!!!!
+      gInterrupted = 1;
+      //this will exit the thread
+      exit_now(0);
+    }
+    if (gSSNumber > 0 && gSSNumber < gTotalSS) {
+      MFLOPS = (gMHz * gFpuCount) / dif; 
+      printf("SS: cycle = %d, dif = %d, MFLOPS = %d, Outputs = %d, Work Count = %d / %d, Cycles/Output = %d\n", 	 
+	     time_lo, dif, MFLOPS, gTotalSteadyItems, gWorkCount, gStreamItTiles * dif, dif/gTotalSteadyItems);
+      fprintf(outputFile, "SS: cycle = %d, dif = %d, MFLOPS = %d, Outputs = %d, Work Count = %d / %d, Cycles/Output = %d\n", 	 
+	      time_lo, dif, MFLOPS, gTotalSteadyItems, gWorkCount, gStreamItTiles * dif , dif/gTotalSteadyItems);
+      //add to the totals
+      gTotalDif += dif;
+      gTotalOutputs += gTotalSteadyItems;
+      gFpuCountTotal += gFpuCount;
+      gWorkCountTotal += gWorkCount;
+    }
+    
+    if (gSSNumber == gTotalSS) {
+      fprintf(outputFile, "tiles ; tiles assigned ; filters ; slices ; cycles; outputs ; Work Cycles ; Total Cycles ; mflops ; OC BufSize Bytes\n");
+      printf("tiles ; tiles assigned ; filters ; slices ; cycles; outputs ; Work Cycles ; Total Cycles ; mflops ; OC BufSize Bytes\n");
+
+      fprintf(outputFile,"%d;%d;%d;%d;%d;%d;%d;%d;%d;%d\n", 
+	      gStreamItTiles, 
+	      gMappedTiles,
+	      gNumFilters,
+	      gNumSlices,
+	      gTotalDif,  gTotalOutputs, 
+	      gWorkCountTotal, 
+	      gStreamItTiles * gTotalDif, 
+	      (gMHz*gFpuCountTotal)/gTotalDif,
+	      gOffChipBufferSizeBytes);
+      
+      printf("%d;%d;%d;%d;%d;%d;%d;%d;%d;%d\n", 
+	     gStreamItTiles, 
+	     gMappedTiles,
+	     gNumFilters,
+	     gNumSlices, 
+	     gTotalDif, gTotalOutputs, 
+	     gWorkCountTotal, 
+	     gStreamItTiles * gTotalDif, 
+	     (gMHz*gFpuCountTotal)/gTotalDif,
+	     gOffChipBufferSizeBytes);
+      //only exit here if you don't want a blood graph
+      if (generate_blood_graph == 0) {
+	gInterrupted = 1;
+	//this will exit the thread
+	exit_now(0);
+      }
+      
+      //we are done getting the numbers, deregister the handler.
+      //EventManager_DeRegisterHandler("issued_instruction", "__event_instr_count");
+      //now get the blood graph for one steady state...
+      setup_bloodgraph("bloodgraph.ppm", gTotalDif/gTotalSS);
+    }
+
+
+    //reset the last steady state
+    gNGlastSteady = time_lo;
+    //reset the mflops counter
+    gFpuCount = 0;
+    gWorkCount = 0;
+    //increment the steady state number
+    gSSNumber++;
+  }
+}
+
+fn install_event_handlers() {
+  //install any devices that need to be installed
+  //register the workcount event
+
+   //register the magic instruction handler the records the end of booting
+  //and installs the deadlock detection event
+  listi_add(gMagicInstrHMS.theList, & fn (procNum, rs, imm, result_ptr)
+  {
+    return reg_deadlock_detection(procNum, rs, imm, result_ptr);
+  });
+
+  EventManager_RegisterHandler("issued_instruction", "__event_instr_count");
+  EventManager_RegisterHandler
+    ("static_network_transfer", "__record_static_transfer");
+}
+
+//this function is a magic instruction handler that is called to 
+//register the deadlock detection event.  One of the filters
+//has the magc as its first ins in begin()
+fn reg_deadlock_detection(procNum, rs, imm, result_ptr) {
+  //check if this magic instruction is for us...
+  if (!((rs == 0) && (imm == 5)))
+    return 0;
+  
+  if (gRegDLDet == 1) {
+    printf("Error: magc that denotes end of booting executed twice.");
+  }
+
+  //printf("Done booting, register deadlock detection event...\n");
+  
+  //register the deadlock detection event
+  EventManager_RegisterHandler("clock", "__check_deadlock");
+  gRegDLDet = 1;
+
+  //we handled this magic instruction
+  return 1;
+}
+
+//for deadlock detection, record that we have transfered a 
+//word over the static network and we are not deadlocked
+fn __record_static_transfer(hms) {
+  local time_hi, time_lo;
+  local proc = Machine_GetProc(machine, 0);
+  
+  //get the cycle
+  Proc_GetCycleCounter(proc, &time_hi, &time_lo);
+  //reset the last useful cycle
+  gLastInsCycle = time_lo;
+}
+
+fn __check_deadlock(hms) {
+  local time_hi, time_lo;
+  local proc = Machine_GetProc(machine, 0);
+  //get the cycle
+  Proc_GetCycleCounter(proc, &time_hi, &time_lo);
+
+  if (time_lo > gLastInsCycle + gDEADLOCK_COUNT) {
+    printf("\n\n ***** DEADLOCK! ***** \n\n");
+    //this should exit!!!!!
+    gInterrupted = 1;
+    //this will exit the thread
+    exit_now(0);
+  }
+}
+
+fn __event_instr_count(hms)
+{
+  local instrDynamic = hms.instr_dynamic;
+  local instrWord = InstrDynamic_GetInstrWord(instrDynamic);
+//  local lWorkCount = gWorkCount;
+  local tileNumber = Proc_GetTileNumber(hms.theProc);
+  local time_hi, time_lo;
+
+  //get the cycle
+  Proc_GetCycleCounter(hms.theProc, &time_hi, &time_lo);
+  
+  //the definition of mapped_tile(int) is in 
+  // the setup.bc generated by the compiler
+  //make sure this tile is mapped before we count it as work
+  if (mapped_tile(tileNumber) == 0) {
+    return;
+  }
+
+  //reset the last useful cycle
+  gLastInsCycle = time_lo;
+  
+  AtomicIncrement(&gWorkCount);
+
+  if (InstrWord_IsFPU(instrWord))
+  {
+    AtomicIncrement(&gFpuCount);
+  }
+
+  else if (InstrWord_IsCacheMissOp(instrWord))
+  {
+    AtomicIncrement(&gMemCount);
+  }
+
+  else if (InstrWord_CanMispredict(instrWord) ||
+	   InstrWord_IsDirectJump(instrWord))
+  {
+    AtomicIncrement(&gBrCount);
+  }
+
+  else if (InstrWord_IsAdmin(instrWord))
+  {
+    AtomicIncrement(&gAdminCount);
+  }
+
+  else
+  {
+    AtomicIncrement(&gAluCount);
+  }
+  
+
+}
+
+fn close_bloodgraph() {
+  free(gRedP); free(gGreenP); free(gBlueP);
+
+  close_ppm(gPPMFILE);
+  //this should exit!!!!!
+  gInterrupted = 1;
+  //this will exit the thread
+  exit_now(0);
+}
+
+fn update_bloodgraph(hms) {
+  local j;
+  local value;
+  //stop updating the blood graph
+  if (gBloodCycles <= 0) {
+    close_bloodgraph();
+  }
+    
+  for (j = 0; j < gNumProc; ++j)
+    {
+      local k;
+      local popcount;
+      local delta;
+      local curPos = 0;
+      local status = Proc_GetStallReason(Machine_GetProc(machine,j));
+      popcount = ((status & 1)
+		  + ((status >> 1) & 1)
+		  + ((status >> 2) & 1)
+		  + ((status >> 3) & 1)
+		  + ((status >> 4) & 1)
+		  + ((status >> 5) & 1)
+		  + ((status >> 6) & 1));
+      delta = (popcount << 16)/gTraceWidth;
+      
+      for (k = 0; k < gTraceWidth-1; k++)
+      {
+	value = get_proc_state_color(j, status,gRedP,gGreenP,gBlueP,curPos>>16);
+	write_ppm(gPPMFILE, *gRedP, *gGreenP, *gBlueP);
+	curPos += delta;
+      }
+      write_ppm(gPPMFILE,0,0,0);
+    }
+  gBloodCycles--;
+}
+
+
+fn setup_bloodgraph(filename, cycles) {
+  gPPMFILE = open_ppm(filename, cycles, gNumProc*gTraceWidth);
+  if (gPPMFILE == NULL)
+  {
+    printf("Error opening %s\n",filename);
+    return 0;
+  }
+  gRedP = malloc(4);
+  gGreenP = malloc(4);
+  gBlueP = malloc(4);
+
+  gBloodCycles = cycles;
+  EventManager_RegisterHandler("clock", "update_bloodgraph"); 
+}
+
+//send the word, accounting for bandwidth
+fn limit_bandwidth(cyclesPerWord) {
+  local i = 0;
+  for (i = 0; i < (cyclesPerWord - 1); i++) {
+    yield;
+  }
+  return;
+}

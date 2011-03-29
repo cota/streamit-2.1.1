@@ -1,0 +1,333 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+            "http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD><TITLE>StreamIt Semantic Checks</TITLE>
+
+<META http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<META name="GENERATOR" content="hevea 1.06">
+</HEAD>
+<BODY >
+<!--HEVEA command line is: hevea -nosymb semantic-checks.hva png.hva semantic-checks.tex -->
+<!--HTMLHEAD-->
+<!--ENDHTML-->
+<!--PREFIX <ARG ></ARG>-->
+<!--CUT DEF section 1 -->
+
+
+<H1 ALIGN=center>StreamIt Semantic Checks</H1>
+
+
+This document contains a list of semantic checks that should be
+performed on StreamIt programs after they have been parsed. These
+assume the program is syntactically correct; it must pass through the
+parser correctly.<BR>
+<BR>
+<!--TOC section Statement Placement-->
+
+<H2><A NAME="htoc1">1</A>&nbsp;&nbsp;Statement Placement</H2><!--SEC END -->
+
+<!--TOC subsection Init, Work, and Helper Functions-->
+
+<H3><A NAME="htoc2">1.1</A>&nbsp;&nbsp;Init, Work, and Helper Functions</H3><!--SEC END -->
+
+<OL type=1><LI>
+<CODE>add</CODE> statements can only appear in init functions in
+ split-joins and pipelines;
+<LI><CODE>split</CODE> and <CODE>join</CODE> statements can only
+ appear in init functions in split-joins and feedback loops;
+<LI><CODE>loop</CODE>, <CODE>body</CODE>, and <CODE>enqueue</CODE>
+ statements can only appear in init functions in feedback loops;
+<LI><CODE>push</CODE> statements can only appear in work and helper
+ functions in filters.
+<LI><CODE>pop</CODE> and <CODE>peek</CODE> expressions can only appear
+ in work and helper functions in filters.
+<LI>If a work function does not declare I/O rates, it may not use
+ <CODE>push</CODE>, <CODE>pop</CODE>, or <CODE>peek</CODE>. If it
+ declares a push rate, though, it must call
+ <CODE>push</CODE>.<SUP><A NAME="text1" HREF="#note1"><FONT SIZE=2>1</FONT></A></SUP>
+<LI>Every filter must have a work function.
+<LI>Every stream object that is not a filter must have an init
+ function, but may have no other functions.<SUP><A NAME="text2" HREF="#note2"><FONT SIZE=2>2</FONT></A></SUP>
+</OL>
+<!--TOC subsection Control Flow and Initialization Code-->
+
+<H3><A NAME="htoc3">1.2</A>&nbsp;&nbsp;Control Flow and Initialization Code</H3><!--SEC END -->
+
+Several statements may only be executed once per function; other
+statements are sensitive to the order in which they are executed.
+<OL type=1><LI>
+<CODE>split</CODE>, <CODE>join</CODE>, <CODE>body</CODE>, and
+ <CODE>loop</CODE> statements must be executed exactly once if they
+ are allowed at all. Every path of control through the
+ initialization code must result in exactly one execution.
+</OL>
+<!--TOC section Typing-->
+
+<H2><A NAME="htoc4">2</A>&nbsp;&nbsp;Typing</H2><!--SEC END -->
+
+<!--TOC subsection Stream Connections-->
+
+<H3><A NAME="htoc5">2.1</A>&nbsp;&nbsp;Stream Connections</H3><!--SEC END -->
+
+``Match'' within this section means an <EM>exact</EM> match in type;
+there is no implicit type promotion across tapes.
+<OL type=1><LI>
+For a pipeline, the input type must match the input type of the
+ first child and the output type of the last child must match the
+ output type of the pipeline.
+<LI>Within a pipeline, the output type of one child must match the
+ input type of the next child.
+<LI>The input type of each of a split-join's children must be either
+ the input type of the split-join or <CODE>void</CODE>. Identical
+ constraints hold for the output.
+<LI>The output type of a feedback loop's loop stream must match the
+ input type of its body stream. The input type of the feedback loop
+ must be either the same type as the body input or <CODE>void</CODE>.
+ Identical constraints hold for the output side of the feedback loop.
+<LI>Exactly one stream in the program has the stream type
+ <CODE>void-&gt;void</CODE>. This stream must be named.
+</OL>
+<!--TOC subsection Implications of Stream Types-->
+
+<H3><A NAME="htoc6">2.2</A>&nbsp;&nbsp;Implications of Stream Types</H3><!--SEC END -->
+
+<OL type=1><LI>
+The splitter of a split-join must be
+ <CODE>roundrobin(0)</CODE> if the input type of the stream is
+ <CODE>void</CODE>; it may not be <CODE>roundrobin(0)</CODE> otherwise.
+ Identical constraints hold for the output.
+<LI>If a split-join has some children with <CODE>void</CODE> inputs and
+ some children with non-<CODE>void</CODE> inputs, the splitter must be
+ a round-robin splitter with a declared weight of 0 for each of the
+ <CODE>void</CODE> children. Identical constraints hold for the
+ output and the joiner.
+<LI>The splitter and joiner of a feedback loop must accomodate
+ exactly two children. If the body and loop children have
+ non-<CODE>void</CODE> input and output types, then the joiner must be
+ equivalent to <CODE>roundrobin(0,1)</CODE> if the input of the loop
+ is <CODE>void</CODE>, and similarly for the splitter and the output.
+<LI>If the input type of a feedback loop's body child is
+ <CODE>void</CODE>, then the loop input type and loop child output
+ type must also be <CODE>void</CODE>, and the joiner must be
+ <CODE>roundrobin(0)</CODE>. Identical constraints hold for the loop
+ output and splitter.
+<LI>If the input type of a filter is <CODE>void</CODE>, all of its
+ work functions must declare peek and pop rates of 0; if its output
+ type is <CODE>void</CODE>, all of its work functions must have a push
+ rate of 0.
+</OL>
+<!--TOC subsection Statements and Expressions-->
+
+<H3><A NAME="htoc7">2.3</A>&nbsp;&nbsp;Statements and Expressions</H3><!--SEC END -->
+
+<OL type=1><LI>
+Types can be promoted: a <CODE>bit</CODE> can be implicitly
+ converted to an <CODE>int</CODE>, an <CODE>int</CODE> can be promoted
+ to a <CODE>float</CODE>, and a <CODE>float</CODE> can be promoted to
+ <CODE>complex</CODE>.
+<LI>Every referenced variable must have a declared type.
+<LI>Every expression has a type:
+<OL type=a><LI>
+The type of a variable reference is the type of the variable;
+<LI>The type of a literal is the lowest type that can contain the
+ literal (the type of <CODE>1</CODE> is <CODE>bit</CODE>, the type of
+ <CODE>2</CODE> is <CODE>int</CODE>, the type of <CODE>2.0</CODE> is
+ <CODE>float</CODE>, and the type of <CODE>2i</CODE> is
+ <CODE>complex</CODE>);
+<LI>The type of a unary expression is the type of the child
+ expression. The type of a binary expression is the join of the
+ types of the child expression, possibly promoted to a type the
+ operator can accept. The type of the first part of the ternary
+ expression must be promotable to <CODE>int</CODE>, and the second and
+ third parts must be promotable to a common type; the resulting type
+ is the common type. In all cases, the types of child expressions
+ must conform to the acceptable types for the operator listed in the
+ language specification.
+<LI>For a field reference <CODE>a.b</CODE>, <CODE>a</CODE> must be of
+ some structure type <CODE>A</CODE>, which must have a field named
+ <CODE>b</CODE>. The type of the expression is the type of
+ <CODE>b</CODE> in the structure declaration.
+<LI>For an array access <CODE>a[i]</CODE>, <CODE>a</CODE> must be of
+ some array type <CODE>T[n]</CODE>, and the type of the expression is
+ <CODE>T</CODE>.
+<LI>The type of a <CODE>peek()</CODE> or <CODE>pop()</CODE> expression
+ is the input type of the filter.
+<LI>The parameter of a <CODE>peek()</CODE> expression and the index
+ of an array must both be of type <CODE>int</CODE>.
+<LI>The type of a call to a helper function is the return type of
+ that function.
+</OL>
+<LI>The type of the parameter of a <CODE>push()</CODE> statement must
+ be the output type of the filter.
+<LI>The type of the parameter of an <CODE>enqueue()</CODE> statement
+ must be the output type of the feedback loop's loop stream.
+<LI>The type of the right-hand side of an assignment statement must
+ be promotable to the type of the left-hand side of the statement.
+</OL>
+<!--TOC subsection Using Names As Types-->
+
+<H3><A NAME="htoc8">2.4</A>&nbsp;&nbsp;Using Names As Types</H3><!--SEC END -->
+
+<OL type=1><LI>
+A bare name may be used as a type in a variable declaration,
+ parameter list, stream type, and elsewhere. The name must match the
+ name of a declared structure type.
+<LI>A bare name may be used as the target type of a
+ <CODE>Portal</CODE> type. The name must match the name of a declared
+ stream type; the target of a portal may not be a primitive type or
+ structure.
+</OL>
+<!--TOC subsection Messaging-->
+
+<H3><A NAME="htoc9">2.5</A>&nbsp;&nbsp;Messaging</H3><!--SEC END -->
+
+<OL type=1><LI>
+A portal type must name a top-level stream structure containing
+ at least one message handler.
+<LI>A message-sending statement must call a function present in the
+ receiver type of its portal.
+<LI>The types of the parameters of a message-sending statement must
+ be promotable to the types of the parameters in the receiving
+ function.
+<LI>Message latencies must be of integer type.
+<LI>When a stream structure is added to a portal, the type of the
+ stream structure must be the same as the receiver type of the
+ portal.
+</OL>
+<!--TOC section Naming-->
+
+<H2><A NAME="htoc10">3</A>&nbsp;&nbsp;Naming</H2><!--SEC END -->
+
+<!--TOC subsection Object Names-->
+
+<H3><A NAME="htoc11">3.1</A>&nbsp;&nbsp;Object Names</H3><!--SEC END -->
+
+<OL type=1><LI>
+No two streams or structures may have the same name.
+<LI>Within a single structure, no two member fields may have the
+ same name. Field names must also be distinct from all stream and
+ structure names.
+<LI>Stream parameters within a single stream must have distinct
+ names from each other and from all stream and structure names.
+<LI>Functions declared within a filter must have unique names; these
+ include message handlers and helper functions. The name of a
+ function must be distinct from stream and structure names.
+<LI>A variable may not be declared with the same name as a stream
+ parameter. (Other variable hiding is legal.) The name of a
+ variable must be distinct from stream, structure, and function
+ names within the current filter.
+</OL>
+<!--TOC subsection Using Names-->
+
+<H3><A NAME="htoc12">3.2</A>&nbsp;&nbsp;Using Names</H3><!--SEC END -->
+
+<OL type=1><LI>
+A stream constructor (the parameter to <CODE>add</CODE>,
+ <CODE>body</CODE>, and <CODE>loop</CODE> statements) must be an
+ anonymous stream declaration, or must have a name matching the name
+ of a stream object with a parameter list matching the parameter list
+ of the the stream.
+<LI>A variable must be declared before it is used.
+<LI>A stream parameter may not be assigned to or otherwise modified.
+<LI>A function call must have a name matching a helper function in
+ the current filter, and a parameter list matching the parameter list
+ of the target function.
+<LI>A message-sending statement must name a portal variable on the
+ left-hand side of the ``.'', and a message name on the right-hand
+ side. The message name must match a message in the target type of
+ the portal, and the statement must have a parameter list matching
+ the parameter list of the message target.
+</OL>
+<!--TOC section Warnings-->
+
+<H2><A NAME="htoc13">4</A>&nbsp;&nbsp;Warnings</H2><!--SEC END -->
+
+Things in this section are technically legal, but indicate
+questionable code:
+<OL type=1><LI>
+Some things in StreamIt are counted; these include split-join
+ children (with fixed-length weighted round-robin splitters or
+ joiners), and work function pushes, pops, and peeks. It should be a
+ warning if the compiler cannot statically confirm that these numbers
+ are not met exactly (or, for peeks, that the peek rate is not
+ exceeded). For feedback loops, the compiler can also issue a
+ warning if it cannot confirm that enough items are enqueued to cause
+ the joiner to be fired at the start of the program.
+<LI>The compiler may need to guess at the I/O types of anonymous
+ streams. If the type isn't clear from context a warning should be
+ issued.
+<LI>A warning may be issued if the compiler cannot verify that
+ splitters and joiners for split-joins can accomodate the exact
+ number of children present. Note that this may only be possible
+ with pattern-matching program text, or by fully unrolling init
+ functions, since the following code is legitimate but data-flow
+ wouldn't find an exact number of children:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>float-&gt;float&nbsp;splitjoin&nbsp;FiveChildren&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;split&nbsp;roundrobin(1,2,3,4,5);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;5;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;add&nbsp;float-&gt;float&nbsp;filter&nbsp;{&nbsp;...&nbsp;};</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;join&nbsp;roundrobin(5,4,3,2,1);</TT><TT><BR>
+</TT><TT>}</TT></DIV></OL>
+<!--TOC section Temporary Checks-->
+
+<H2><A NAME="htoc14">5</A>&nbsp;&nbsp;Temporary Checks</H2><!--SEC END -->
+
+These checks are necessary due to current constraints in the StreamIt
+compiler. They should be able to be removed when the compiler is
+improved.
+<OL type=1><LI>
+All child-constructing statements in initialization code must
+ have consistent types. While the front-end can perform minimal
+ data-flow analysis to check that the types of pipelines, control
+ flow like the following is presently illegal:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>int-&gt;int&nbsp;filter&nbsp;IntIntBody&nbsp;{&nbsp;...&nbsp;}</TT><TT><BR>
+</TT><TT>int-&gt;int&nbsp;filter&nbsp;IntIntLoop&nbsp;{&nbsp;...&nbsp;}</TT><TT><BR>
+</TT><TT>float-&gt;int&nbsp;filter&nbsp;FloatIntBody&nbsp;{&nbsp;...&nbsp;}</TT><TT><BR>
+</TT><TT>int-&gt;float&nbsp;filter&nbsp;IntFloatLoop&nbsp;{&nbsp;...&nbsp;}</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>void-&gt;int&nbsp;feedbackloop&nbsp;SketchyLoop(int&nbsp;p)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;join&nbsp;roundrobin(0,&nbsp;1);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;if&nbsp;(p)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;body&nbsp;IntIntBody();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;loop&nbsp;IntIntLoop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}&nbsp;else&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;body&nbsp;FloatIntBody();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;loop&nbsp;IntFloatLoop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;split&nbsp;duplicate;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;enqueue(1);</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+ The types of the loop and all of its components are consistent
+ regardless of the value of <CODE>p</CODE>, but if <CODE>p</CODE> is
+ zero, the <CODE>enqueue</CODE> statement takes a <CODE>float</CODE>
+ parameter. Presently the front-end should reject this construction
+ since it is unclear if the types around the joiner are consistent or
+ not. This check can be removed if the compiler does stream
+ type-checking after constant propagation.
+<LI>None of the names listed in the ``Implementation Limits''
+ section of the language specification should be used. These include
+ the capitalized names <CODE>SplitJoin</CODE>,
+ <CODE>FeedbackLoop</CODE>, <CODE>Filter</CODE>, <CODE>Pipeline</CODE>,
+ <CODE>StreamIt</CODE>, and <CODE>Complex</CODE>.
+</OL>
+<!--BEGIN NOTES document-->
+<HR WIDTH="50%" SIZE=1><DL><DT><A NAME="note1" HREF="#text1"><FONT SIZE=5>1</FONT></A><DD>Declaring a nonzero peek rate affects the
+ scheduling but not correctness, so you're not obligated to peek;
+ however, you are obligated to pop the right number of items.
+<DT><A NAME="note2" HREF="#text2"><FONT SIZE=5>2</FONT></A><DD>This is
+ currently implicit in the language syntax. The constraint and
+ syntax could both change due to reinitialization, or by adding
+ message handlers to composite streams.
+</DL>
+<!--END NOTES-->
+<!--HTMLFOOT-->
+<!--ENDHTML-->
+<!--FOOTER-->
+<HR SIZE=2>
+<BLOCKQUOTE><EM>This document was translated from L<sup>A</sup>T<sub>E</sub>X by
+</EM><A HREF="http://pauillac.inria.fr/~maranget/hevea/index.html"><EM>H<FONT SIZE=2><sup>E</sup></FONT>V<FONT SIZE=2><sup>E</sup></FONT>A</EM></A><EM>.
+</EM></BLOCKQUOTE>
+</BODY>
+</HTML>

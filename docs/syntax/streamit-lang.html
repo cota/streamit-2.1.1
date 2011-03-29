@@ -1,0 +1,1351 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+            "http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD><TITLE>StreamIt Language Specification 
+Version 2.1</TITLE>
+
+<META http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<META name="GENERATOR" content="hevea 1.06">
+</HEAD>
+<BODY >
+<!--HEVEA command line is: hevea -nosymb streamit-lang.hva png.hva streamit-lang.tex -->
+<!--HTMLHEAD-->
+<!--ENDHTML-->
+<!--PREFIX <ARG ></ARG>-->
+<!--CUT DEF section 1 -->
+
+
+<H1 ALIGN=center>StreamIt Language Specification<BR>
+Version 2.1</H1>
+
+<H3 ALIGN=center><TT>streamit@cag.csail.mit.edu</TT></H3>
+
+<H3 ALIGN=center>September, 2006</H3><!--TOC section Table of Contents-->
+
+<H2>Table of Contents</H2><!--SEC END -->
+
+
+<!--TOC section Introduction-->
+
+<H2><A NAME="htoc1">1</A>&nbsp;&nbsp;Introduction</H2><!--SEC END -->
+
+StreamIt is a language intended to simplify coding of
+signal-processing and other streaming computations. The programmer
+constructs a stream graph, containing blocks with a single input and a
+single output, and describes the function of atomic blocks and the
+structure of composite blocks. The compiler generates code for each
+block, and applies optimizations to the stream graph to produce
+efficient code for the target architecture.<BR>
+<BR>
+The current implementation of the StreamIt compiler translates the
+syntax described in this document to Java code, which can then be
+either run against a Java library or compiled to C code and linked
+with a runtime library. Since the compiler can reconstruct the stream
+graph, it can combine adjacent filters, or split computationally
+intensive filters into multiple parts, or duplicate filters to have
+more parallel computation.<BR>
+<BR>
+The StreamIt language is vaguely reminiscent of other imperative
+languages such as C or Java. In particular, the bodies of filter work
+functions and stream initialization code is generally legal Java
+code.<BR>
+<BR>
+<!--TOC section Types-->
+
+<H2><A NAME="htoc2">2</A>&nbsp;&nbsp;Types</H2><!--SEC END -->
+
+This section describes the various data and object types used in
+StreamIt programs. Data types are passed along tapes between stream
+objects, and can be used as local variables. Stream objects are only
+created in initialization code and form a static stream graph.<BR>
+<BR>
+<!--TOC subsection Data Types-->
+
+<H3><A NAME="htoc3">2.1</A>&nbsp;&nbsp;Data Types</H3><!--SEC END -->
+
+Data types are always created atomically. They are of fixed size, and
+are generally statically allocated.<BR>
+<BR>
+<!--TOC subsubsection Primitive Types-->
+
+<H4><A NAME="htoc4">2.1.1</A>&nbsp;&nbsp;Primitive Types</H4><!--SEC END -->
+
+<A NAME="sec:primitive-types"></A>
+The following primitive types exist in StreamIt:
+<DL COMPACT=compact><DT>
+<CODE><B>boolean</B></CODE><DD> Either <CODE>true</CODE> or
+ <CODE>false</CODE>.<BR>
+<BR>
+<DT><CODE><B>bit</B></CODE><DD> A one-bit unsigned integer type, containing
+ the value <CODE>0</CODE> or <CODE>1</CODE>.<BR>
+<BR>
+<DT><CODE><B>int</B></CODE><DD> A signed integer type, of unspecified length.
+ This length will typically be the native word length on the target
+ machine; for Raw and x86 compilation, this is usually 32 bits.<BR>
+<BR>
+<DT><CODE><B>float</B></CODE><DD> A floating-point type, of the best precision
+ that will give good performance. On x86 this is a double-precision
+ float, since computation with single-precision floats is implicitly
+ converted to double-precision; on Raw, this is single-precision,
+ since that is all that is supported in hardware.<BR>
+<BR>
+<DT><CODE><B>complex</B></CODE><DD> A floating-point complex type, of the same
+ precision as <CODE>float</CODE>. This has real and imaginary parts,
+ which can be directly accessed with <CODE>c.real</CODE> and
+ <CODE>c.imag</CODE>.
+</DL>
+<A NAME="sec:operators"></A>
+A number of operations are supported on these primitive types; these
+are listed in Table <A HREF="#tab:primitive-operators">1</A>. In a binary or
+ternary expression, if two expressions are of different primitive
+types, they are promoted to the lowest type on the list above. Real
+expressions converted to <CODE>complex</CODE> have an imaginary part of
+zero. <CODE>|</CODE>, <CODE>&amp;</CODE>, and <CODE>^</CODE> are bitwise or,
+and, and exclusive-or operators, respectively; <CODE>!</CODE> is a
+boolean not. The boolean logic
+operators <CODE>&amp;&amp;</CODE> and <CODE>||</CODE> behave as in C: they are
+short-circuiting, integer values of exactly zero are false, and other
+values are true. <CODE>==</CODE> and other comparison operators return
+a boolean value.
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+<DIV ALIGN=center>
+<TABLE CELLSPACING=2 CELLPADDING=0>
+<TR><TD BGCOLOR=black COLSPAN=3><TABLE BORDER=0 WIDTH="100%" CELLSPACING=0 CELLPADDING=1><TR><TD></TD></TR></TABLE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><B>Operators</B></TD>
+<TD ALIGN=center NOWRAP><B>Types</B></TD>
+</TR>
+<TR><TD BGCOLOR=black COLSPAN=3><TABLE BORDER=0 WIDTH="100%" CELLSPACING=0 CELLPADDING=1><TR><TD></TD></TR></TABLE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>?:</CODE></TD>
+<TD ALIGN=center NOWRAP>Any</TD>
+<TD ALIGN=left NOWRAP>First part must be <CODE>boolean</CODE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>||</CODE></TD>
+<TD ALIGN=center NOWRAP><CODE>int</CODE>, <CODE>bit</CODE>, <CODE>boolean</CODE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>&amp;&amp;</CODE></TD>
+<TD ALIGN=center NOWRAP><CODE>int</CODE>, <CODE>bit</CODE>, <CODE>boolean</CODE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>|</CODE>, <CODE>&amp;</CODE>, <CODE>^</CODE></TD>
+<TD ALIGN=center NOWRAP><CODE>int</CODE>, <CODE>bit</CODE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>==</CODE>, <CODE>!=</CODE></TD>
+<TD ALIGN=center NOWRAP>Any</TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>&lt;</CODE>, <CODE>&lt;=</CODE>, <CODE>&gt;</CODE>, <CODE>&gt;=</CODE></TD>
+<TD ALIGN=center NOWRAP><CODE>int</CODE>, <CODE>float</CODE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>+</CODE>, <CODE>-</CODE></TD>
+<TD ALIGN=center NOWRAP><CODE>int</CODE>, <CODE>float</CODE>, <CODE>complex</CODE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>*</CODE>, <CODE>/</CODE>, <CODE>\lstinline</CODE>int|, <CODE>float</CODE>, <CODE>complex</CODE></TD>
+<TD ALIGN=center NOWRAP><CODE>\lstinline</CODE>(cast)|</TD>
+<TD ALIGN=left NOWRAP>Any</TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>!</CODE></TD>
+<TD ALIGN=center NOWRAP><CODE>boolean</CODE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><CODE>++</CODE>, <CODE>--</CODE></TD>
+<TD ALIGN=center NOWRAP><CODE>int</CODE></TD>
+</TR>
+<TR><TD BGCOLOR=black COLSPAN=3><TABLE BORDER=0 WIDTH="100%" CELLSPACING=0 CELLPADDING=1><TR><TD></TD></TR></TABLE></TD>
+</TR></TABLE>
+</DIV>
+
+<BR>
+<DIV ALIGN=center>Table 1: Operators on primitive types</DIV><BR>
+
+<A NAME="tab:primitive-operators"></A>
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+<!--TOC subsubsection Structures-->
+
+<H4><A NAME="htoc5">2.1.2</A>&nbsp;&nbsp;Structures</H4><!--SEC END -->
+
+<A NAME="sec:data-structures"></A>
+Named structures of heterogeneous data types are supported. A
+structure must be of a fixed size. It contains a set of fields, each
+of which has a name and a data type. Any primitive or array type, and
+any structure type which has been previously declared in the program,
+may be used; recursive structures are not allowed. The following two
+structure definitions are both legal:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>struct&nbsp;A&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;int&nbsp;a;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;int[4]&nbsp;b;</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>struct&nbsp;B&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;A&nbsp;a;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;A[4]&nbsp;b;</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+A structure definition contains the keyword <CODE>struct</CODE>, the name
+of the structure, an open brace, a listing of field (variable)
+declarations, and a close brace. It is not followed by a semicolon.<BR>
+<BR>
+The only supported operations on structures are field references and
+copying. Field references are of the form <CODE>a.b</CODE>; <CODE>a</CODE> must
+be of some structure type <CODE>A</CODE>, and <CODE>b</CODE> must be a field named
+in the structure declaration of <CODE>A</CODE>. The type of this expression
+is the declared type of the field. Note that a similar syntax is used
+for referencing the real and imaginary parts of complex numbers; there
+is an implicit structure declaration<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>struct&nbsp;complex&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;float&nbsp;real,&nbsp;imag;</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+along with some syntactic sugar to make complex arithmetic work.<BR>
+<BR>
+<!--TOC subsubsection Arrays-->
+
+<H4><A NAME="htoc6">2.1.3</A>&nbsp;&nbsp;Arrays</H4><!--SEC END -->
+
+Arrays of any data type described here are supported. Arrays must be
+of a fixed length. Array types are written with the base type name,
+followed by a single dimension in square brackets. Multi-dimensional
+arrays or matrices are supported as arrays of arrays.<BR>
+<BR>
+<!--TOC subsubsection Portals-->
+
+<H4><A NAME="htoc7">2.1.4</A>&nbsp;&nbsp;Portals</H4><!--SEC END -->
+
+A portal is a special type of variable used for teleport messaging
+(see Section&nbsp;<A HREF="#sec:messaging">6</A>). Portals allow control messages to
+be sent to a set of filters with a given type. They are declared
+using a template on that type: <CODE>portal&lt;FilterType&gt;</CODE>.<BR>
+<BR>
+<!--TOC subsubsection Variable Declarations-->
+
+<H4><A NAME="htoc8">2.1.5</A>&nbsp;&nbsp;Variable Declarations</H4><!--SEC END -->
+
+Variable declarations appear in structure declarations, as well as in
+code blocks, static blocks and stream declarations. A variable
+declaration may declare one or multiple variables, possibly with
+initializers; multiple variables are separated with commas. Of note,
+the syntax for array declarations is different from C and Java. A
+correct declaration is <CODE>int[4]&nbsp;rgbi;</CODE>, with the entire type
+stated before the variable name. A static array initializer may be
+provided as in C and Java, for example:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>int[3][2]&nbsp;arr&nbsp;=&nbsp;{{1,&nbsp;2},&nbsp;{3,&nbsp;4},&nbsp;{5,&nbsp;6}};</TT></DIV><BR>
+<!--TOC subsubsection Static Blocks-->
+
+<H4><A NAME="htoc9">2.1.6</A>&nbsp;&nbsp;Static Blocks</H4><!--SEC END -->
+
+Read-only constants can be made visible to all streams in the program
+by declaring them within a <CODE>static</CODE> block. A static block
+contains one or more variable declarations, as well as an optional
+<CODE>init</CODE> function to initialize data:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>static&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;float&nbsp;PI&nbsp;=&nbsp;3.14159;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;float[100]&nbsp;sqrtTable;</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;init&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i=0;&nbsp;i&lt;100;&nbsp;i++)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sqrtTable[i]&nbsp;=&nbsp;sqrt(i);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+Variables declared within a static block have global scope across the
+current compilation unit. They are initialized at load time and
+remain constant throughout the lifetime of the program. Thus,
+variables declared within a static block are read-only outside of the
+block.<BR>
+<BR>
+<!--TOC subsection Stream Types-->
+
+<H3><A NAME="htoc10">2.2</A>&nbsp;&nbsp;Stream Types</H3><!--SEC END -->
+
+Computation in StreamIt is performed within stream objects. Every
+stream object has an input type and an output data type; the object is
+connected to ``tapes'' of a hypothetically infinite number of
+homogeneous data objects. <EM>Filters</EM> are atomic, and have
+initialization code and steady-state work code; <EM>pipelines</EM>,
+<EM>splitjoins</EM>, and <EM>feedback loops</EM> are all composite
+structures that include some number of stream objects as children.<BR>
+<BR>
+All stream objects have initialization code that runs when the object
+is first created. For filters, this code may be omitted, and
+generally just sets up filter-local state. For composite objects, the
+initialization code is responsible for creating the child objects.
+Filters also have one or more <EM>work functions</EM>, which are called
+each time the filter executes.<BR>
+<BR>
+<!--TOC paragraph I/O types.-->
+
+<H5>I/O types.</H5><!--SEC END -->
+ Each stream declared at the top level must
+also explicitly declare its input and output types. This is a
+declaration like <CODE>int-&gt;int</CODE> or <CODE>float-&gt;complex</CODE>;
+the first type is the stream's input type, the second its output type.
+Either type may be <CODE>void</CODE>; in this case, the stream has no
+input or output, as appropriate. If it is a filter, it must not
+declare a peek, pop, or push rate. The top-level stream in a
+program has type <CODE>void-&gt;void</CODE>; no other streams of this type
+are allowed.<BR>
+<BR>
+<!--TOC subsubsection Stream Parameters-->
+
+<H4><A NAME="htoc11">2.2.1</A>&nbsp;&nbsp;Stream Parameters</H4><!--SEC END -->
+
+A stream may have a set of parameters provided to it. These
+parameters are available to all functions within the stream type, and
+may not be changed. Values for these parameters must be passed in
+when the stream is created. Stream parameters are declared with types
+and names in a parenthesized list after the name of the stream; when a
+stream it instantiated, values for the parameters must follow the name
+of the stream. For example:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>//&nbsp;declaration</TT><TT><BR>
+</TT><TT>float-&gt;float&nbsp;filter&nbsp;MatrixMatrixMultiply(int&nbsp;A,</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;B,&nbsp;int&nbsp;C)&nbsp;{&nbsp;...&nbsp;}</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>void-&gt;void&nbsp;pipeline&nbsp;Toplevel()&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;Source();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;//&nbsp;instantiation</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;MatrixMatrixMultiply(3,&nbsp;5,&nbsp;4);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;Sink();</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+Note that it is also possible to pass a parameterized-length array as
+a parameter to a stream, so long as the length is also passed as a
+parameter. For example, the following is a legal filter declaration:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>int-&gt;int&nbsp;filter&nbsp;FIR&nbsp;(int&nbsp;N,&nbsp;int[N]&nbsp;weights)&nbsp;{&nbsp;...&nbsp;}</TT></DIV><BR>
+<!--TOC paragraph Compile-time constants.-->
+
+<H5>Compile-time constants.</H5><!--SEC END -->
+ Several things in StreamIt must
+be <EM>compile-time constant</EM>; for example, the I/O rates of a
+filter must be determined at compile-time, and the compiler must be
+able to statically create the expanded stream graph. An expression is a
+compile-time constant if it is a literal, a stream parameter, or an
+expression whose components are compile-time constants.<BR>
+<BR>
+<!--TOC subsubsection Parameterized Stream Types-->
+
+<H4><A NAME="htoc12">2.2.2</A>&nbsp;&nbsp;Parameterized Stream Types</H4><!--SEC END -->
+
+Stream types may be <EM>parameterized</EM> on some data type or types,
+much like ``template'' types in C++. This may be used for
+data-reordering operations, and is used for several cases of built-in
+filters.<BR>
+<BR>
+Parameterized objects cannot currently be created by the user. To
+instantiate a built-in parameterized type, use the name of the stream
+type, followed by the name of the data type in angle brackets, such as
+<CODE>Identity&lt;int&gt;</CODE>.
+<DL COMPACT=compact><DT><DD><B>Note:</B>
+User-instantiated parameterized types are a future StreamIt
+extension.
+</DL>
+<!--TOC subsubsection Filters-->
+
+<H4><A NAME="htoc13">2.2.3</A>&nbsp;&nbsp;Filters</H4><!--SEC END -->
+
+All computation in StreamIt takes place within filters. Filters must
+explicitly declare their initialization code if present, but also have
+the option of omitting it. A filter has a single work function.
+The work
+function must declare its <EM>I/O rates</EM>, the number of items 
+it removes, examines, or places on its tape. A basic filter
+declaration looks like this:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>int-&gt;int&nbsp;filter&nbsp;IntAvgFilter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;init&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;empty</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;peek&nbsp;2&nbsp;push&nbsp;1&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(peek(0)&nbsp;+&nbsp;peek(1));</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+This filter is named <CODE>IntAvgFilter</CODE>; it reads integers off of its
+input tape, and writes integers to its output tape. Each execution of
+the work function removes exactly one item from the input tape and
+examines at most two items; it causes exactly one item to be pushed on
+to the output tape.<BR>
+<BR>
+<!--TOC paragraph Init functions.-->
+
+<H5>Init functions.</H5><!--SEC END -->
+ Init functions are declared using the
+keyword <CODE>init</CODE>. They take no parameters. They may initialize
+filter fields or do other work, but have no access to the filter's
+tapes.<BR>
+<BR>
+<!--TOC paragraph Filter state.-->
+
+<H5>Filter state.</H5><!--SEC END -->
+ The top level of the filter may include
+variable declarations. These variables are visible to every function
+in the filter, and may be used to carry state between iterations of
+the work function. We refer to these variables as <I>fields</I>
+of the filter. For example, the variable <CODE>i</CODE> is a field of
+the following filter:
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>void-&gt;int&nbsp;filter&nbsp;Counter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;int&nbsp;i&nbsp;=&nbsp;0;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;push&nbsp;1&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(i++);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+<!--TOC paragraph Work functions.-->
+
+<H5>Work functions.</H5><!--SEC END -->
+ Work functions are declared using the
+keyword <CODE>work</CODE>, which must be followed by rate declarations.<BR>
+<BR>
+Rate declarations consist of <CODE>push&nbsp;rate-expr</CODE>,
+<CODE>peek&nbsp;rate-expr</CODE>, and <CODE>pop&nbsp;rate-expr</CODE>,
+in any order. The push and pop rates specify the number of items
+produced and consumed by a given execution of the work function. The
+peek rate specifies the maximum index that is peeked in a given
+execution; that is, given a peek rate of <I>r</I>, the filter can execute
+<CODE>peek(i)</CODE> for all <I>i</I> &lt; <I>r</I>.<BR>
+<BR>
+Each rate expression is of the form <CODE>[min,&nbsp;avg,&nbsp;max]</CODE>, where
+<CODE>min</CODE> denotes the minimum number of items, <CODE>avg</CODE>
+denotes the average number of items (over all executions), and
+<CODE>max</CODE> denotes the maximum number of items. The average rate
+may optionally be ommitted, in which case the rate declaration is of
+the form <CODE>[min,&nbsp;max]</CODE>. If only one expression appears, then
+it represents both the minimum and maximum rate (i.e., the rates are
+equal); in this case, the brackets are ommitted. For example, a work
+function that pops exactly 1 item and pushes between 2 and 4 items,
+with an average of 3 items, is declared as follows:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>work&nbsp;pop&nbsp;1&nbsp;push&nbsp;[2,&nbsp;3,&nbsp;4]&nbsp;{&nbsp;...&nbsp;}</TT></DIV><BR>
+The declaration above signifies a <I>dynamic rate</I> in that the exact
+number of items produced on any given execution is unknown at compile
+time. <BR>
+<BR>
+Rate declarations support two forms of dynamism:
+<UL><LI>A rate that falls within a static range, as specified above.<BR>
+<BR>
+<LI>A rate that is completely unpredictable. In this case, the
+special token <CODE>*</CODE> may be substituted for one or more of the
+<CODE>min</CODE>, <CODE>avg</CODE>, and <CODE>max</CODE> fields in the
+declaration. For example, the following filter pushes one item and
+pops an unbounded number of items:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>int-&gt;int&nbsp;filter&nbsp;FilterLessThan(int&nbsp;N)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;push&nbsp;1&nbsp;pop&nbsp;[1,*]&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(peek(0)&nbsp;&lt;&nbsp;N)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(peek(0));</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV></UL>
+There is also some syntactic sugar for rate declarations:
+<UL><LI>If the push or pop rate is omitted, it is assumed to be zero.
+The corresponding input or output tape type must be <CODE>void</CODE>.<BR>
+<BR>
+<LI>If the peek rate is omitted, it is assumed to be equal to the
+pop rate.<BR>
+<BR>
+<LI>If the peek rate is specified, it should not be smaller than the
+pop rate.</UL>
+<!--TOC paragraph Prework Functions.-->
+
+<H5>Prework Functions.</H5><!--SEC END -->
+ A filter may specify an additional work 
+function that is run in place of the normal work function the first
+time the filter executes. This function uses the <CODE>prework</CODE>
+keyword, and is otherwise identical to the normal work function.<BR>
+<BR>
+Prework functions can be very useful for setting up initial conditions
+based on the first set of inputs, or for pushing extra items on the
+first invocation. For example, consider the following implementation
+of a Delay:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>float-&gt;float&nbsp;filter&nbsp;Delay(int&nbsp;N)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;prework&nbsp;push&nbsp;N&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i=0;&nbsp;i&lt;N;&nbsp;i++)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;push(0.0);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;push&nbsp;1&nbsp;pop&nbsp;1{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(pop());</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+<!--TOC paragraph Limitations on work and prework functions-->
+
+<H5>Limitations on work and prework functions</H5><!--SEC END -->
+
+The push, peek, and pop expressions
+in the declaration of a <CODE>work</CODE> or <CODE>prework</CODE> function
+must be correct for the compilers to produce correct output. These
+declarations can not, in general be statically checked. They are
+dynamically checked in the <CODE>library</CODE> back end, but are not
+checked at all in the compiled back ends. An incorrect single numeric value
+for one of these expressions may cause obscure bugs in the compiled
+code, as may an incorrect maximum value for a range.<BR>
+<BR>
+<!--TOC paragraph Helper functions.-->
+
+<H5>Helper functions.</H5><!--SEC END -->
+ A helper function performs some
+auxiliary bit of computation, and may be called from the init function
+or the work function. A helper function has a list of zero or more
+parameters, and returns zero or one values. A helper function
+declaration contains the return type, the name of the function, the
+parameter list, and the function body, just like a normal C or Java
+function.<BR>
+<BR>
+Helper functions may also access the I/O tapes using <CODE>peek</CODE>,
+<CODE>pop</CODE>, and <CODE>push</CODE>, in which case they must declare
+their I/O rates just like the work function. The declared rates
+represent all I/O operations performed by the filter between the start
+and end of the function (including operations in other functions that
+are called by the given function). For example:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>//&nbsp;produces&nbsp;a&nbsp;square&nbsp;wave&nbsp;with&nbsp;period&nbsp;2*N</TT><TT><BR>
+</TT><TT>void-&gt;float&nbsp;filter&nbsp;SquareWave(int&nbsp;N)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;push&nbsp;2*N&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pushZeros();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pushOnes();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;void&nbsp;pushZeros()&nbsp;push&nbsp;N&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i=0;&nbsp;i&lt;N;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;push(0.0);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;void&nbsp;pushOnes()&nbsp;push&nbsp;N&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i=0;&nbsp;i&lt;N;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;push(1.0);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+<!--TOC paragraph Message-handler functions.-->
+
+<H5>Message-handler functions.</H5><!--SEC END -->
+ A message handler function
+changes the state of the filter in response to some external event,
+delivered via a message. It is declared with the keyword
+<CODE>handler</CODE>, the name of the message, the parameter list, and
+the function body. A message handler cannot return a value, so no
+return type is declared. See Section&nbsp;<A HREF="#sec:messaging">6</A> for more
+details on messaging.<BR>
+<BR>
+<!--TOC subsubsection Pipelines-->
+
+<H4><A NAME="htoc14">2.2.4</A>&nbsp;&nbsp;Pipelines</H4><!--SEC END -->
+
+The simplest composite stream is a pipeline. A pipeline contains a
+number of child streams; the output of the first stream is connected
+to the input of the second, whose output is connected to the input of
+the third, and so on. A pipeline declaration looks like<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>float-&gt;complex&nbsp;pipeline&nbsp;FloatToComplexAdd&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;ReImToComplex();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;ComplexPairAdd();</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+The body of the pipeline declaration is the initialization code; no
+internal function declarations 
+are allowed. In addition to the internal typing constraints mentioned
+previously, the input type of the pipeline must match the input type
+of the first filter, and the output type of the pipeline must match
+the output type of the last filter.
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+ <DIV ALIGN=center>
+ <IMG SRC="streamit-lang001.png">
+ <BR>
+<DIV ALIGN=center>Figure 1: Pipelines</DIV><BR>
+
+ <A NAME="fig:pipeline"></A>
+ </DIV>
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+<!--TOC subsubsection Splitjoins-->
+
+<H4><A NAME="htoc15">2.2.5</A>&nbsp;&nbsp;Splitjoins</H4><!--SEC END -->
+
+A splitjoin allows computation to be run in parallel, possibly using
+different parts of the input stream. It is so named because incoming
+data passes through a <EM>splitter</EM>, is redistributed to the child
+streams for processing, and then is fed through a <EM>joiner</EM> to be
+recombined into a single output stream; see section
+<A HREF="#sec:splitters-joiners">2.2.7</A>.<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>int-&gt;int&nbsp;splitjoin&nbsp;AddAndSub&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;split&nbsp;duplicate;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;IntAdder();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;IntSubtractor();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;join&nbsp;roundrobin;</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+This splitjoin has two children. Incoming data is duplicated onto
+both streams. The first branch consumes two elements and adds them;
+the second consumes two elements and subtracts them. The resulting
+values are then pushed onto the output stream in a round-robin
+fashion, with values from alternating streams.
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+ <DIV ALIGN=center>
+ <IMG SRC="streamit-lang002.png">
+ <BR>
+<DIV ALIGN=center>Figure 2: Splitjoins</DIV><BR>
+
+ <A NAME="fig:splitjoin"></A>
+ </DIV>
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+<!--TOC subsubsection Feedback Loops-->
+
+<H4><A NAME="htoc16">2.2.6</A>&nbsp;&nbsp;Feedback Loops</H4><!--SEC END -->
+
+A feedback loop has a body stream. Its output passes through a
+splitter; one branch of the splitter leaves the loop, and the other
+goes to the loop stream. The output of the loop stream and the loop
+input then go through a joiner to the body's input.<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>float-&gt;float&nbsp;feedbackloop&nbsp;AddFeedback(float&nbsp;scaling)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;join&nbsp;roundrobin;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;body&nbsp;FloatAdder();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;loop&nbsp;FloatScaler(scaling);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;split&nbsp;duplicate;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;enqueue&nbsp;0.0;</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+The <CODE>body</CODE> and <CODE>loop</CODE> declarations may be omitted;
+if so, an implicit <CODE>Identity</CODE> filter of the appropriate type
+is inserted.
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+ <DIV ALIGN=center>
+ <IMG SRC="streamit-lang003.png">
+ <BR>
+<DIV ALIGN=center>Figure 3: Feedback Loop</DIV><BR>
+
+ <A NAME="fig:feedback-loop"></A>
+ </DIV>
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+<!--TOC paragraph Semantics of splitters and joiners.-->
+
+<H5>Semantics of splitters and joiners.</H5><!--SEC END -->
+ Splitters and joiners
+both treat the stream input as the first child, and the loop edge as
+the second child. Splitters and joiners that do not allow exactly two
+children are disallowed.<BR>
+<BR>
+<!--TOC paragraph <CODE>enqueue</CODE> statement.-->
+
+<H5><CODE>enqueue</CODE> statement.</H5><!--SEC END -->
+ The <CODE>enqueue</CODE>
+statement takes a value and places it in FIFO order on the output tape
+from the loop stream. You will generally need to enqueue enough items
+that the input joiner will be able to fire once; enqueuing more items
+causes a delay in the feedback loop.<BR>
+<BR>
+<!--TOC subsubsection Splitters and Joiners-->
+
+<H4><A NAME="htoc17">2.2.7</A>&nbsp;&nbsp;Splitters and Joiners</H4><!--SEC END -->
+
+<A NAME="sec:splitters-joiners"></A>
+Splitters have a single input tape and multiple output tapes; joiners
+have multiple input tapes and a single output tape. They appear in
+feedback loops and splitjoins.<BR>
+<BR>
+<!--TOC paragraph <CODE>duplicate</CODE> Splitters.-->
+
+<H5><CODE>duplicate</CODE> Splitters.</H5><!--SEC END -->
+ <CODE>duplicate</CODE> 
+splitters take each incoming item and push the same item to each of
+the outgoing tapes, duplicating data.<BR>
+<BR>
+<!--TOC paragraph <CODE>roundrobin</CODE> Splitters and Joiners.-->
+
+<H5><CODE>roundrobin</CODE> Splitters and Joiners.</H5><!--SEC END -->
+ <CODE>roundrobin</CODE> 
+splitters take each item and send it to exactly one of the child
+streams, in order. Either <CODE>roundrobin</CODE> or
+<CODE>roundrobin()</CODE> causes one item to be sent to each output, in
+order; <CODE>roundrobin(2)</CODE> causes two items to be sent to the
+first stream, two to the second, and so on. <CODE>roundrobin(2,&nbsp;4,2)</CODE> 
+requires there to be exactly three children, and sends two to
+the first child, four to the second, and two to the third. A
+round-robin weight may be 0; in this case, the child input must be of
+type <CODE>void</CODE>. A <CODE>roundrobin(0)</CODE> splitter on a
+splitjoin means that no children take any input, and the input type
+of the entire splitjoin is <CODE>void</CODE>.<BR>
+<BR>
+<CODE>roundrobin</CODE> joiners are identical to <CODE>roundrobin</CODE>
+splitters, except that they read from the input tapes in the specified
+pattern and write data to the output tape.<BR>
+<BR>
+<!--TOC subsubsection Anonymous Streams-->
+
+<H4><A NAME="htoc18">2.2.8</A>&nbsp;&nbsp;Anonymous Streams</H4><!--SEC END -->
+
+<A NAME="sec:anonymous-streams"></A>
+It is possible to declare a stream object without a name, if it is
+used in exactly one place in the program. In general anonymous stream
+declarations look exactly like the corresponding normal stream
+declaration, except that the stream type is optional for non-filter
+streams and the name is omitted. The semicolon that normally ends the
+<CODE>add</CODE>, <CODE>body</CODE>, or <CODE>loop</CODE> statement is
+optional in this case.<BR>
+<BR>
+
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>complex-&gt;float&nbsp;feedbackloop&nbsp;FeedbackMagnitude(float&nbsp;scaling)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;join&nbsp;roundrobin;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;body&nbsp;complex-&gt;float&nbsp;filter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;work&nbsp;pop&nbsp;2&nbsp;push&nbsp;1&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;push(abs(peek(0)&nbsp;*&nbsp;peek(1)));</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pop();&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;};</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;loop&nbsp;pipeline&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;add&nbsp;float-&gt;float&nbsp;filter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;push&nbsp;1&nbsp;{&nbsp;push(pop()&nbsp;*&nbsp;scaling);&nbsp;}</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;};</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;add&nbsp;FloatToComplex();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;};</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;split&nbsp;duplicate;</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+The input and output types of anonymous streams are determined by the
+compiler, if these types are not explicitly specified in the code.<BR>
+<BR>
+Anonymous streams do not have stream parameters. In certain cases,
+though, code within anonymous streams can access variables and stream
+parameters from the containing stream. Values so referenced must be
+compile-time constant. Fields of the containing stream cannot be
+accessed, and local variables and stream parameters in the containing
+code cannot be modified.<BR>
+<BR>
+<!--TOC subsection Execution Model-->
+
+<H3><A NAME="htoc19">2.3</A>&nbsp;&nbsp;Execution Model</H3><!--SEC END -->
+
+StreamIt does not explicitly assume sequential or parallel hardware.
+A component of the stream graph may <EM>fire</EM>, possibly in parallel
+with other firings, if its conditions to execute are met. The
+scheduler in the compiler chooses an order to execute filters such
+that the firing conditions are met. A particular back-end may place
+additional restrictions on firings; a uniprocessor back-end may
+require that only one stream object executes at a time, or a parallel
+back-end might add the constraint that two objects may not both be
+executing if the output of one is an input of another. These
+constraints are transparent to the programmer, however.
+<UL><LI>
+A filter may fire when its input has at least as many items as
+ its peek rate.
+It pops its pop rate from the input, and pushes its push rate onto
+ its output.
+<LI>A joiner in a feedback loop or splitjoin may fire when the
+ specified number of items are available on each of its inputs. It
+ pushes the sum of the input weights onto its output.
+<LI>A round-robin splitter may fire when the sum of the number of
+ output items is available on its input, and produces the specified
+ number of items on each output.
+<LI>A duplicate splitter may fire when at least one item is
+ available on its input. It pops one item from its input and pushes
+ one item to each output.
+</UL>
+The programmer should think of each work function as firing
+atomically. However, the compiler may choose to run filters in
+parallel, or to interleave certain work functions (this is sometimes
+necessary in the case of unbounded I/O rates). Such transformations
+will not be observable unless the programmer uses <CODE>print</CODE>
+statements (the only function with side effects) within multiple
+filters.<BR>
+<BR>
+<!--TOC section Statements-->
+
+<H2><A NAME="htoc20">3</A>&nbsp;&nbsp;Statements</H2><!--SEC END -->
+
+This section describes statements legal in StreamIt code. For the
+most part, these are identical to legal statements in C or Java. Some
+statements, particularly those that set up the stream graph, are only
+legal in initialization code; other statements are legal anywhere.<BR>
+<BR>
+<!--TOC subsection Initialization-Only Statements-->
+
+<H3><A NAME="htoc21">3.1</A>&nbsp;&nbsp;Initialization-Only Statements</H3><!--SEC END -->
+
+<!--TOC subsubsection <CODE>add</CODE> Statement-->
+
+<H4><A NAME="htoc22">3.1.1</A>&nbsp;&nbsp;<CODE>add</CODE> Statement</H4><!--SEC END -->
+
+The <CODE>add</CODE> statement adds a child stream to the current stream
+object. It is valid in splitjoins and pipelines only. In a
+splitjoin, it adds a new stream to the end of the current list of
+children. In a pipeline, it adds a new stream to the end of the chain
+of children.<BR>
+<BR>
+This statement takes a <EM>stream constructor</EM>; see section
+<A HREF="#sec:expr-stream-constructor">4.2</A>.<BR>
+<BR>
+<!--TOC subsubsection <CODE>body</CODE> Statement-->
+
+<H4><A NAME="htoc23">3.1.2</A>&nbsp;&nbsp;<CODE>body</CODE> Statement</H4><!--SEC END -->
+
+The <CODE>body</CODE> statement adds a child stream as the body part of
+a feedback loop. This statement must be executed at most once in the
+initialization code of a feedback loop, and is invalid anywhere else.
+If a feedback loop does not contain a <CODE>body</CODE> statement, an
+<CODE>Identity</CODE> filter of the appropriate type is used by
+default.<BR>
+<BR>
+This statement takes a <EM>stream constructor</EM>; see section
+<A HREF="#sec:expr-stream-constructor">4.2</A>.<BR>
+<BR>
+<!--TOC subsubsection <CODE>enqueue</CODE> Statement-->
+
+<H4><A NAME="htoc24">3.1.3</A>&nbsp;&nbsp;<CODE>enqueue</CODE> Statement</H4><!--SEC END -->
+
+The <CODE>enqueue</CODE> statement is valid only within the
+initialization code of a feedback loop. It causes the specified item
+to be placed after all other previously enqueued items on the input to
+the feedback loop joiner. This statement takes a single value
+expression.<BR>
+<BR>
+<!--TOC subsubsection <CODE>join</CODE> Statement-->
+
+<H4><A NAME="htoc25">3.1.4</A>&nbsp;&nbsp;<CODE>join</CODE> Statement</H4><!--SEC END -->
+
+The <CODE>join</CODE> statement declares the joiner type of a feedback
+loop or splitjoin. It only appears in initialization code, and is
+invalid in initialization code for any other construct. <BR>
+<BR>
+<!--TOC subsubsection <CODE>loop</CODE> Statement-->
+
+<H4><A NAME="htoc26">3.1.5</A>&nbsp;&nbsp;<CODE>loop</CODE> Statement</H4><!--SEC END -->
+
+The <CODE>loop</CODE> statement adds a child stream as the loop part of
+a feedback loop. This statement must be executed at most once in the
+initialization code of a feedback loop, and is invalid anywhere else.
+If a feedback loop does not contain a <CODE>loop</CODE> statement, an
+<CODE>Identity</CODE> filter of the appropriate type is used by
+default.<BR>
+<BR>
+This statement takes a <EM>stream constructor</EM>; see section
+<A HREF="#sec:expr-stream-constructor">4.2</A>.<BR>
+<BR>
+<!--TOC subsubsection <CODE>split</CODE> Statement-->
+
+<H4><A NAME="htoc27">3.1.6</A>&nbsp;&nbsp;<CODE>split</CODE> Statement</H4><!--SEC END -->
+
+The <CODE>split</CODE> statement declares the splitter type of a feedback
+loop or splitjoin. It only appears in initialization code, and is
+invalid in initialization code for any other construct. <BR>
+<BR>
+<!--TOC subsection Work and Helper Statements-->
+
+<H3><A NAME="htoc28">3.2</A>&nbsp;&nbsp;Work and Helper Statements</H3><!--SEC END -->
+
+These statements may appear only within <CODE>work</CODE> or helper
+functions.
+<BR>
+<BR>
+<!--TOC subsubsection <CODE>push</CODE> Statement-->
+
+<H4><A NAME="htoc29">3.2.1</A>&nbsp;&nbsp;<CODE>push</CODE> Statement</H4><!--SEC END -->
+
+The <CODE>push</CODE> statement takes a value expression and pushes its
+value onto the output tape of the current filter. The type of the
+expression must match the output type of the filter.<BR>
+<BR>
+<!--TOC subsubsection Message-sending Statements-->
+
+<H4><A NAME="htoc30">3.2.2</A>&nbsp;&nbsp;Message-sending Statements</H4><!--SEC END -->
+
+As detailed in Section&nbsp;<A HREF="#sec:messaging">6</A>, filters can exchange
+control messages by invoking methods on portal variables. The syntax
+of this is like a Java function call: the portal variable name is
+followed by a period, the name of the message handler, and a parameter
+list. There is also an optional latency range enclosed in brackets.<BR>
+<BR>
+<!--TOC subsection General-use Statements-->
+
+<H3><A NAME="htoc31">3.3</A>&nbsp;&nbsp;General-use Statements</H3><!--SEC END -->
+
+These statements may appear anywhere code is legal.<BR>
+<BR>
+<!--TOC subsubsection Statements with Java-like Semantics-->
+
+<H4><A NAME="htoc32">3.3.1</A>&nbsp;&nbsp;Statements with Java-like Semantics</H4><!--SEC END -->
+<BR>
+<BR>
+<CODE>do</CODE>, <CODE>for</CODE>, and <CODE>while</CODE> loops have the same
+syntax and semantics they do in Java. The <CODE>continue</CODE> and
+<CODE>break</CODE> statements are also recognized, though they may not
+take a label reference.<BR>
+<BR>
+For statements whose syntax match exactly<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>for&nbsp;(i&nbsp;=&nbsp;S;&nbsp;i&nbsp;&lt;&nbsp;N;&nbsp;i++)</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;/*&nbsp;body&nbsp;*/&nbsp;;</TT></DIV><BR>
+cause the induction variable <CODE>i</CODE> to be compile-time constant
+within the loop if the start and end indices <CODE>S</CODE> and <CODE>N</CODE> are
+also compile-time constant.<BR>
+<BR>
+<!--TOC subsubsection Assignment Statements-->
+
+<H4><A NAME="htoc33">3.3.2</A>&nbsp;&nbsp;Assignment Statements</H4><!--SEC END -->
+
+Assignment statements have the form <CODE>lhs&nbsp;=&nbsp;expr;</CODE>. The left-hand
+side may be a variable, a field reference, or an array element
+reference. Each of these is evaluated to a location, with the result
+being either a primitive value, a structure, or an entire array. If
+it is a primitive value, the right-hand side must be a value
+expression. Otherwise, the right-hand side must be an array or
+structure of identical type, and causes all of the elements from the
+right-hand-side object to be copied to the left-hand-side object.<BR>
+<BR>
+<!--TOC subsubsection Variable Declarations-->
+
+<H4><A NAME="htoc34">3.3.3</A>&nbsp;&nbsp;Variable Declarations</H4><!--SEC END -->
+
+Variable declarations have the form <CODE>type&nbsp;name;</CODE>. <CODE>type</CODE>
+must be a data type; <CODE>name</CODE> may be any legal name not
+corresponding to another variable previously declared in the current
+block. A declaration must appear before the variable is used. The
+variable declaration may also contain an initialization, as in
+<CODE>type&nbsp;name&nbsp;=&nbsp;expr;</CODE> The initialization acts exactly as an
+initialization statement, above.<BR>
+<BR>
+Variables declared without initialization are initialized to 0 as best
+as possible. <CODE>complex</CODE> variables are initialized to
+<CODE>0+0i</CODE>. Each element of an array variable is initialized to
+0 as described here. Similarly, each field of a structure variable is
+initialized to 0 in the same way.<BR>
+<BR>
+<!--TOC section Expressions-->
+
+<H2><A NAME="htoc35">4</A>&nbsp;&nbsp;Expressions</H2><!--SEC END -->
+
+<!--TOC subsection Value Expressions-->
+
+<H3><A NAME="htoc36">4.1</A>&nbsp;&nbsp;Value Expressions</H3><!--SEC END -->
+
+<A NAME="sec:expr-value"></A>
+A <EM>value expression</EM> carries some value of a data type. Literal
+values are value expressions; these can be signed integer or real
+values, e.g. <CODE>17</CODE>, <CODE>2.45</CODE>, or <CODE>1.4e6</CODE>. A literal value
+can also be a pure imaginary number, e.g. <CODE>17i</CODE> or <CODE>3.4i</CODE>.
+Unary, binary, and ternary expressions of value expressions are also
+value expressions, as described in section <A HREF="#sec:operators">2.1.1</A>. Thus,
+while <CODE>3+4i</CODE> is not a literal, it is a valid value expression of
+complex type.<BR>
+<BR>
+Field references to structure objects are also value expressions.
+These have the form <CODE>a.b</CODE>, where <CODE>a</CODE> is a variable of
+structured type <CODE>A</CODE> and <CODE>b</CODE> is a field in <CODE>A</CODE>.
+Similarly, array references <CODE>a[b]</CODE> are value expressions;
+<CODE>a</CODE> must be an array variable, and <CODE>b</CODE> must be an
+integer-valued value expression.<BR>
+<BR>
+<!--TOC subsubsection <CODE>peek</CODE> and <CODE>pop</CODE>-->
+
+<H4><A NAME="htoc37">4.1.1</A>&nbsp;&nbsp;<CODE>peek</CODE> and <CODE>pop</CODE></H4><!--SEC END -->
+
+<A NAME="sec:expr-peek-pop"></A>
+The <CODE>peek</CODE> and <CODE>pop</CODE> expressions look at items on
+the incoming tape in a filter's work or helper functions; they are
+illegal in init or message-handler functions. <CODE>peek(n)</CODE>
+examines the n-th item on the tape without removing it;
+<CODE>peek(0)</CODE> returns the next incoming item,
+<CODE>peek(1)</CODE> the one afterwards, and so on. <CODE>pop()</CODE>
+returns the same item <CODE>peek(0)</CODE> returns, but also removes it
+from the tape.
+<DL COMPACT=compact><DT><DD><B>Note:</B>
+There is not a guaranteed evaluation order for StreamIt expressions,
+and the implementation of <CODE>pop()</CODE> in C doesn't give any
+guarantees for when the item is actually removed from the tape. Thus,
+an expression should contain no more than one <CODE>pop()</CODE>, and
+if there is one, there should be no <CODE>peek()</CODE>s.
+</DL>
+Note that <CODE>pop()</CODE> removes an item from the tape, so
+<CODE>peek()</CODE>s afterwards use different indices. A function may
+not peek at more items than it declares in its rate declaration,
+though it may peek at fewer. The peek declaration declares the
+furthest position on the tape examined from the point of view of the
+beginning of the function.<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>int-&gt;int&nbsp;filter&nbsp;PeekRates&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;peek&nbsp;3&nbsp;push&nbsp;1&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;a,&nbsp;b,&nbsp;c,&nbsp;d,&nbsp;e;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;=&nbsp;peek(0);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;b&nbsp;=&nbsp;peek(1);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;c&nbsp;=&nbsp;pop();&nbsp;&nbsp;&nbsp;//&nbsp;Same&nbsp;value&nbsp;as&nbsp;a</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;d&nbsp;=&nbsp;peek(0);&nbsp;//&nbsp;Same&nbsp;value&nbsp;as&nbsp;b</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;e&nbsp;=&nbsp;peek(1);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(a&nbsp;+&nbsp;b&nbsp;+&nbsp;c&nbsp;+&nbsp;d&nbsp;+&nbsp;e);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+This function pops one item and pushes 1. It declares a peek rate of
+3 because <CODE>e</CODE> peeks at the third item that was on the tape
+at the start of the function -- one is popped, and <CODE>e</CODE>
+contains the second item beyond that.<BR>
+<BR>
+<!--TOC subsubsection Function Calls-->
+
+<H4><A NAME="htoc38">4.1.2</A>&nbsp;&nbsp;Function Calls</H4><!--SEC END -->
+
+<A NAME="sec:expr-funcall"></A>
+Function calls are value expressions; certain cases of built-in
+functions may return values that are compile-time constant if their
+parameters are compile-time constant. The function call syntax
+<CODE>fn(p1,&nbsp;p2)</CODE> is identical to that of Java. All parameters
+are passed by value, with all elements of structures and arrays
+implicitly copied across a call; this differs from Java's semantics,
+in which the value passed is a reference (i.e., a pointer) to each
+object and array parameter.<BR>
+<BR>
+Function calls may be made to declared helper functions, or to
+built-in math functions. The math functions are listed in Table
+<A HREF="#tab:math-functions">2</A>.
+<DL COMPACT=compact><DT><DD><B>Note:</B>
+ As an implementation detail, any function name not optimized as a
+ built-in function in the front-end or recognized as a helper function is treated as a call to a function in the Java
+ package <CODE>java.lang.Math</CODE>; see <EM>Java in a Nutshell</EM> or
+ another Java reference for details. These get blindly translated
+ again to calls to the C math library.
+</DL>
+<DL COMPACT=compact><DT><DD><B>Note:</B>
+ It is conceivable that calls to side-effect-free functions with
+ compile-time constant parameters return compile-time constant
+ results. This is only the case for built-in functions in the
+ current implementation of the compiler; adding this involves
+ inlining helper functions, and doing analysis to determine if a
+ helper is in fact side-effect free.
+</DL>
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+ <DIV ALIGN=center>
+ <TABLE CELLSPACING=2 CELLPADDING=0>
+<TR><TD BGCOLOR=black COLSPAN=2><TABLE BORDER=0 WIDTH="100%" CELLSPACING=0 CELLPADDING=1><TR><TD></TD></TR></TABLE></TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><TT>abs(v)</TT></TD>
+<TD ALIGN=left NOWRAP>Real absolute value or complex magnitude</TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><TT>arg(v)</TT></TD>
+<TD ALIGN=left NOWRAP>Polar angle of complex value</TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><TT>exp(v)</TT></TD>
+<TD ALIGN=left NOWRAP>Real or complex exponent</TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><TT>log(v)</TT></TD>
+<TD ALIGN=left NOWRAP>Real or complex natural logarithm</TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><TT>sin(v)</TT></TD>
+<TD ALIGN=left NOWRAP>Real or complex sine</TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><TT>cos(v)</TT></TD>
+<TD ALIGN=left NOWRAP>Real or complex cosine</TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><TT>sqrt(v)</TT></TD>
+<TD ALIGN=left NOWRAP>Real or complex square root</TD>
+</TR>
+<TR><TD ALIGN=center NOWRAP><TT>csqrt(v)</TT></TD>
+<TD ALIGN=left NOWRAP>Complex square root</TD>
+</TR>
+<TR><TD BGCOLOR=black COLSPAN=2><TABLE BORDER=0 WIDTH="100%" CELLSPACING=0 CELLPADDING=1><TR><TD></TD></TR></TABLE></TD>
+</TR></TABLE>
+ <BR>
+<DIV ALIGN=center>Table 2: StreamIt Math Functions</DIV><BR>
+
+ <A NAME="tab:math-functions"></A>
+ </DIV>
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+<!--TOC subsubsection Typecasts-->
+
+<H4><A NAME="htoc39">4.1.3</A>&nbsp;&nbsp;Typecasts</H4><!--SEC END -->
+
+If a primitive type in parentheses precedes an expression, that
+expression is interpreted as being of the particular type. See the
+listing of types in Section <A HREF="#sec:primitive-types">2.1.1</A>. Conversions to
+types later in the list take place in the obvious way:
+<CODE>boolean</CODE> values convert to <CODE>bit</CODE> values with 0
+for <CODE>false</CODE> and 1 for <CODE>true</CODE>, <CODE>bit</CODE>
+values convert to <CODE>int</CODE> values with the same value, and so
+on. <CODE>float</CODE> values convert to <CODE>complex</CODE> values
+with an imaginary part of 0. Conversions to types earlier in the list
+may lose data; conversions from <CODE>complex</CODE> are not possible,
+<CODE>bit</CODE> converts to <CODE>boolean</CODE> in the obvious way.
+The exact conversion from <CODE>float</CODE> to <CODE>int</CODE> is not
+specified. <CODE>int</CODE> values of 0 convert to <CODE>bit</CODE>
+values of 0, and other <CODE>int</CODE> values convert to 1.<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>/*&nbsp;For&nbsp;each&nbsp;input,&nbsp;pushes&nbsp;(float)&nbsp;1&nbsp;if&nbsp;the&nbsp;integer&nbsp;representation</TT><TT><BR>
+</TT><TT>&nbsp;*&nbsp;of&nbsp;the&nbsp;input&nbsp;has&nbsp;the&nbsp;64-bit&nbsp;set.&nbsp;*/</TT><TT><BR>
+</TT><TT>float-&gt;float&nbsp;filter&nbsp;TypeCast&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;push&nbsp;1&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;complex&nbsp;c&nbsp;=&nbsp;(complex)pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;float&nbsp;f&nbsp;=&nbsp;abs(c);&nbsp;//&nbsp;can't&nbsp;directly&nbsp;cast&nbsp;from&nbsp;complex</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;i&nbsp;=&nbsp;(int)f;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;bit&nbsp;b&nbsp;=&nbsp;(bit)(i&nbsp;&amp;&nbsp;64);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push((float)b);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+<!--TOC subsection Stream Constructors-->
+
+<H3><A NAME="htoc40">4.2</A>&nbsp;&nbsp;Stream Constructors</H3><!--SEC END -->
+
+<A NAME="sec:expr-stream-constructor"></A>
+A <EM>stream constructor</EM> indicates that a new stream object should
+be created. Stream constructors appear in <CODE>add</CODE>,
+<CODE>body</CODE>, and <CODE>loop</CODE> statements in composite stream
+initialization code.<BR>
+<BR>
+Stream constructors may reference an already-declared stream type. In
+this case, the stream constructor form is <CODE>Name(param,...)</CODE>.
+There must be exactly as many parameters in the constructor as
+parameters for the stream type. 
+<BR>
+<BR>
+An anonymous stream declaration is also a valid stream constructor;
+see section <A HREF="#sec:anonymous-streams">2.2.8</A>. A statement containing an
+anonymous stream declaration does not need to be terminated with a
+semicolon, since it ends with a close-brace.<BR>
+<BR>
+A stream constructor may be followed by the keyword <CODE>to</CODE> and
+the name of a portal variable. This causes the newly created stream
+to be registered with the named portal. See
+Section&nbsp;<A HREF="#sec:messaging">6</A> for details.<BR>
+<BR>
+<!--TOC section Built-in Types-->
+
+<H2><A NAME="htoc41">5</A>&nbsp;&nbsp;Built-in Types</H2><!--SEC END -->
+
+This section describes built in data and stream types in StreamIt.
+These types are implicitly declared; code can just use these types
+without explicitly importing or otherwise declaring them.<BR>
+<BR>
+<!--TOC subsection Built-in Data Types-->
+
+<H3><A NAME="htoc42">5.1</A>&nbsp;&nbsp;Built-in Data Types</H3><!--SEC END -->
+
+The <CODE>complex</CODE> type is actually implemented as a structure,
+though the compiler implements syntactic sugar for complex variables.
+The structure definition is shown above in section
+<A HREF="#sec:data-structures">2.1.2</A>.
+It is legal to explicitly reference the <CODE>real</CODE> and
+<CODE>imag</CODE> fields of complex numbers as though they were the
+structure type instead.<BR>
+<BR>
+<!--TOC subsection Built-in Streams-->
+
+<H3><A NAME="htoc43">5.2</A>&nbsp;&nbsp;Built-in Streams</H3><!--SEC END -->
+
+Several stream types are in common use, and are either simple enough
+or require non-standard language functionality that the compiler
+should support them directly. These include parameterized
+<CODE>Identity</CODE>, <CODE>FileReader</CODE>, and <CODE>FileWriter</CODE> types, as
+shown in figure <A HREF="#fig:built-in-streams">4</A>.
+<BLOCKQUOTE><DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV>
+ <DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>template&lt;T&gt;&nbsp;T-&gt;T&nbsp;filter&nbsp;Identity&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;push&nbsp;1&nbsp;{&nbsp;push(pop());&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT>template&lt;T&gt;&nbsp;void-&gt;T&nbsp;filter&nbsp;FileReader</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;(string&nbsp;filename)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;push&nbsp;1&nbsp;{&nbsp;/*&nbsp;Implementation&nbsp;defined&nbsp;*/&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT>template&lt;T&gt;&nbsp;T-&gt;void&nbsp;filter&nbsp;FileWriter</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;(string&nbsp;filename)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;pop&nbsp;1&nbsp;{&nbsp;/*&nbsp;Implementation&nbsp;defined&nbsp;*/&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV>
+ <BR>
+<DIV ALIGN=center>Figure 4: Built-in Stream Types</DIV><BR>
+
+ <A NAME="fig:built-in-streams"></A>
+<DIV ALIGN=center><HR WIDTH="80%" SIZE=2></DIV></BLOCKQUOTE>
+<!--TOC section Teleport Messaging-->
+
+<H2><A NAME="htoc44">6</A>&nbsp;&nbsp;Teleport Messaging</H2><!--SEC END -->
+
+<A NAME="sec:messaging"></A>
+It is sometimes necessary to send occasional messages outside of the
+normal stream data flow. A radio application might contain an in-band
+signal requesting a change in the listening frequency, for example;
+this signal would happen infrequently, but it would be detected by a
+filter late in the application and require a change in a filter early
+in the application. StreamIt provides an out-of-band messaging system
+called ``teleport messaging'' to accomodate this sort of application.<BR>
+<BR>
+Only filters can receive messages. The possible messages are defined
+by message handler functions; these functions have the keyword
+<CODE>handler</CODE> in place of their return type. A message is sent
+to a <EM>portal</EM>, which can have multiple targets registered with
+it.<BR>
+<BR>
+<!--TOC subsection Portals-->
+
+<H3><A NAME="htoc45">6.1</A>&nbsp;&nbsp;Portals</H3><!--SEC END -->
+ 
+A portal is a special type of variable. It is associated with a
+single message receiver type; the full type name is
+<CODE>portal&lt;ReceiverType&gt;</CODE>. Unlike other variables in StreamIt,
+portals are passed by reference in stream parameters. Declaring a
+portal as a local variable, and then passing that as a parameter to a
+child stream which adds a filter to the portal, results in the filter
+also being added to the portal in the original container. When a
+filter is created, it may be added to a portal by adding the keyword
+<CODE>to</CODE> and the portal variable to the end of the declaration
+(see Section&nbsp;<A HREF="#sec:messaging-example">6.4</A> for an example).<BR>
+<BR>
+<!--TOC subsection Sending and receiving messages-->
+
+<H3><A NAME="htoc46">6.2</A>&nbsp;&nbsp;Sending and receiving messages</H3><!--SEC END -->
+ 
+Work or helper functions may send messages through portals. This
+looks like a function call in Java: the portal name is followed by a
+period, the message name, and a parenthesized parameter list. This
+may, optionally, be followed by a message latency, which specifies the
+minimum and maximum delay to receive the message. The latency
+specification is an open bracket, a minimum latency, a colon, a
+maximum latency, and a close bracket. If the latency specification is
+omitted, the default message latency is zero (for both the minimum and
+maximum).<BR>
+<BR>
+For each filter that receives messages, the runtime system maintains a
+queue to hold incoming messages. This queue is checked prior to each
+execution of the work function; any messages in the queue are
+dispatched to the appropriate message handlers.<BR>
+<BR>
+<!--TOC subsection Message timing-->
+
+<H3><A NAME="htoc47">6.3</A>&nbsp;&nbsp;Message timing</H3><!--SEC END -->
+
+Messages sent with a fixed latency (i.e., the minimum and maximum
+latencies are equal) on a given execution of the sending filter will
+always arrive at a given execution of the receiving filter. This
+deterministic property holds even if the compiler is parallelizing or
+reordering the filters at runtime. Messages sent with a range of
+latencies (i.e., the minimum and maximum latencies are different) are
+sent as if some latency is chosen from within the range on every
+message invocation.<BR>
+<BR>
+For each pair of message senders and receivers, there must be a
+directed path in the stream graph from one filter to the other
+(messages cannot be sent between filters on parallel paths in a
+splitjoin). We refer to the filter at the start of this path as the
+<I>upstream</I> filter, and the filter at the end of this path as the
+<I>downstream</I> filter.<BR>
+<BR>
+Messages are timed relative to a <I>pull schedule</I>. A pull schedule
+corresponds to a sequence of atomic filter firings. For each pair of
+message senders and receivers, a pull schedule executes the upstream
+filter as few times as possible for each execution of the downstream
+filter. This corresponds to a fine-grained execution with the minimal
+amount of buffering between filters. While the runtime system may
+deviate from the pull schedule, it must time the delivery of messages
+as if the pull schedule is in effect.<BR>
+<BR>
+Assuming execution under a pull schedule, messages sent with default
+(zero) latency are immediately added to the message queue of the
+target stream. Non-zero latencies are measured in terms of filter
+executions. If a filter sends a message with latency <I>k</I> during its
+<I>n</I>th execution, the outcome is equivalent to sending a message with
+latency 0 during its <I>n</I>+<I>k</I>th execution.<BR>
+<BR>
+Message latencies can be interpreted as follows. If the message is
+sent in the direction of dataflow (from an upstream node to a
+downstream node), a positive latency indicates that the message is
+synchronized with some data that the message sender will produce in
+the future. Likewise, a negative latency synchronizes the message
+with some data that the message sender produced in the past.<BR>
+<BR>
+If a message is sent opposite the direction of dataflow (from a
+downstream node to an upstream node), a positive latency synchronizes
+the message with some data the message sender will consume in the
+future. In this case, negative latencies are illegal (they correspond
+to data consumed by the message sender in the past).<BR>
+<BR>
+<!--TOC subsection Messaging Example-->
+
+<H3><A NAME="htoc48">6.4</A>&nbsp;&nbsp;Messaging Example</H3><!--SEC END -->
+
+<A NAME="sec:messaging-example"></A>
+The following code uses teleport messaging to count in sequence:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>void-&gt;void&nbsp;pipeline&nbsp;Counter&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;portal&lt;Sink&gt;&nbsp;p;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;Source(p);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;add&nbsp;Sink&nbsp;to&nbsp;p;</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>void-&gt;int&nbsp;filter&nbsp;Source(portal&lt;Sink&gt;&nbsp;p)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;int&nbsp;i&nbsp;=&nbsp;1;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(0);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;p.count(i++);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>int-&gt;void&nbsp;filter&nbsp;Sink&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;int&nbsp;output&nbsp;=&nbsp;0;</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;pop();</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;print(output);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;handler&nbsp;count(int&nbsp;val)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;output&nbsp;=&nbsp;val;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+When run for 6 iterations, the code above outputs ``123456''. The
+pull schedule executes the Source and Sink in alternation. On the
+first execution of the Source, a <CODE>count()</CODE> message is sent
+to portal <TT>p</TT> with the default latency of zero. The message is
+immediately added to the Sink's incoming message queue. Thus, when
+the Sink executes, it checks the queue and handles the message before
+executing <TT>work</TT>, thereby updating its <CODE>output</CODE> variable
+before it is printed to the screen.<BR>
+<BR>
+Suppose that the message was sent with a latency of 1 instead of 0:<BR>
+<DIV ALIGN=left><TT> </TT><TT>
+</TT><TT>void-&gt;int&nbsp;filter&nbsp;Source(portal&lt;Sink&gt;&nbsp;p)&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;int&nbsp;i&nbsp;=&nbsp;1;</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;work&nbsp;{</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;push(0);</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;&nbsp;&nbsp;p.count(i++)&nbsp;[1:1];</TT><TT><BR>
+</TT><TT>&nbsp;&nbsp;}</TT><TT><BR>
+</TT><TT>}</TT></DIV><BR>
+In this case, the program outputs ``012345'' because the message was
+effectively sent one iteration later.<BR>
+<BR>
+<!--TOC section History-->
+
+<H2><A NAME="htoc49">7</A>&nbsp;&nbsp;History</H2><!--SEC END -->
+
+<!--TOC subsection StreamIt 2.1-->
+
+<H3><A NAME="htoc50">7.1</A>&nbsp;&nbsp;StreamIt 2.1</H3><!--SEC END -->
+
+Adding support for dynamic rates, teleport messaging, static sections,
+and prework functions.<BR>
+<BR>
+<!--TOC subsection StreamIt 2.0-->
+
+<H3><A NAME="htoc51">7.2</A>&nbsp;&nbsp;StreamIt 2.0</H3><!--SEC END -->
+
+The first formal language specification for StreamIt documented
+StreamIt 2.0. Version 2.0 of the language adds a completely new
+syntax with simplified constructs for declaring stream objects but
+keeping a Java-like syntax for the bodies of init and work functions.
+It also changes
+from delay functions to <CODE>enqueue</CODE> statements in feedback
+loops. The <CODE>null</CODE> splitter/joiner type was replaced with
+<CODE>roundrobin(0)</CODE>.<BR>
+<BR>
+<!--TOC subsection StreamIt 1.0-->
+
+<H3><A NAME="htoc52">7.3</A>&nbsp;&nbsp;StreamIt 1.0</H3><!--SEC END -->
+
+The initial StreamIt compiler was based on a restricted subset of
+Java, dubbed StreamIt 1.0. This version of the language used pure
+Java syntax for stream constructs, and was compilable with a normal
+Java compiler given an appropriate run-time library. Early
+publications referred to the language as StreaMIT, but this
+capitalization is now deprecated.<BR>
+<BR>
+<!--HTMLFOOT-->
+<!--ENDHTML-->
+<!--FOOTER-->
+<HR SIZE=2>
+<BLOCKQUOTE><EM>This document was translated from L<sup>A</sup>T<sub>E</sub>X by
+</EM><A HREF="http://pauillac.inria.fr/~maranget/hevea/index.html"><EM>H<FONT SIZE=2><sup>E</sup></FONT>V<FONT SIZE=2><sup>E</sup></FONT>A</EM></A><EM>.
+</EM></BLOCKQUOTE>
+</BODY>
+</HTML>

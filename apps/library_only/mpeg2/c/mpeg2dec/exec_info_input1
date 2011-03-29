@@ -1,0 +1,8 @@
+### EXEC INFO MODULE FOR: mpeg2dec input 1
+
+# input1 is from 
+SETUP="ln -s $BASE_DIR/input1/mei16v2.m2v .";
+PREFIX="";
+ARGS="-b mei16v2.m2v -r -f -oO rec%d";
+CHECK="diff $BASE_DIR/output1/rec0.Y rec0.Y ; diff $BASE_DIR/output1/rec0.U rec0.U ; diff $BASE_DIR/output1/rec0.V rec0.V ; diff $BASE_DIR/output1/rec1.Y rec1.Y ; diff $BASE_DIR/output1/rec1.U rec1.U ; diff $BASE_DIR/output1/rec1.V rec1.V ; diff $BASE_DIR/output1/rec2.Y rec2.Y ; diff $BASE_DIR/output1/rec2.U rec2.U ; diff $BASE_DIR/output1/rec2.V rec2.V ; diff $BASE_DIR/output1/rec3.Y rec3.Y ; diff $BASE_DIR/output1/rec3.U rec3.U ; diff $BASE_DIR/output1/rec3.V rec3.V ";
+CLEANUP="rm -f rec?.? mei16v2.m2v";

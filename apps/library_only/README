@@ -1,0 +1,3 @@
+At the current time, these programs execute correctly only under
+the Java library, which is invoked using 'strc -library Filename.str'.
+They will run much faster once they are supported by the compiler.

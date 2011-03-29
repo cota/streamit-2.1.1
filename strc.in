@@ -1,0 +1,863 @@
+#!@PERL@
+#
+# strc: StreamIt compiler wrapper
+# David Maze <dmaze@cag.lcs.mit.edu>
+# $Id: strc,v 1.106 2006/09/11 19:16:03 thies Exp $
+#
+# Copyright 2003 by the Massachusetts Institute of Technology.
+#
+# Permission to use, copy, modify, and distribute this
+# software and its documentation for any purpose and without
+# fee is hereby granted, provided that the above copyright
+# notice appear in all copies and that both that copyright
+# notice and this permission notice appear in supporting
+# documentation, and that the name of M.I.T. not be used in
+# advertising or publicity pertaining to distribution of the
+# software without specific, written prior permission.
+# M.I.T. makes no representations about the suitability of
+# this software for any purpose.  It is provided "as is"
+# without express or implied warranty.
+#
+
+use strict;
+use warnings;
+use vars qw(%opts $java $javac $cc $rm $make $have_fftw);
+use POSIX qw(:sys_wait_h);
+
+use Cwd;
+
+# AUTOCONFISCATE $var = "@VAR@";
+$java = "@JAVA@";
+$javac = "@JAVAC@";
+$cc = "@CC@";
+$rm = "@RM@";
+$make = "@MAKE@";
+$have_fftw = "@HAVE_FFTW@";
+# END AUTOCONFISCATE
+
+# Turn off warnings: code is currently a mix of 1.4 and 1.5.
+$javac = $javac . " -nowarn";
+# Enable assertions globally:
+$java = $java . " -ea";
+# Run with profiling (output in java.hprof.txt)
+#$java = $java . " -Xrunhprof:cpu=samples,heap=all -ea";
+
+use Getopt::Long;
+Getopt::Long::Configure("bundling", "bundling_override", "no_ignore_case");
+
+my $compiler_opts;
+my $lib_opts;
+
+###
+# Process command line
+#
+# $fns      : reference to array of file names.
+# %opts     : options with minimal processing, indicates what backend needed.
+# %lib_opts : options to be passed to library backend, sanitized.
+# %compiler_opts : options to be passed to compioler backends, sanitized. 
+###
+get_options() or die "Error parsing options";
+if ($opts{'much-more-help'})
+  {
+    usage(\*STDOUT, 2);
+    exit(0);
+  }
+if ($opts{'more-help'})
+  {
+    usage(\*STDOUT, 1);
+    exit(0);
+  }
+if ($opts{help})
+  {
+    usage(\*STDOUT, 0);
+    exit(0);
+  }
+if (!$opts{home})
+  {
+    print <<EOH;
+The STREAMIT_HOME environment variable is unset.  Please see the
+instructions in the INSTALL file; you will need to modify your shell's
+startup files, then log out and log in again.
+EOH
+#'
+    exit(1);
+  }
+if (!@ARGV)
+  {
+    print <<EOH;
+strc: StreamIt compiler wrapper
+Usage: strc [options] file.str ...
+Run 'strc --help' for option listing
+EOH
+    exit(1);
+  }
+if ($opts{library}) {
+    $lib_opts = get_lib_opts();
+} else {
+    $compiler_opts = get_compiler_opts();
+}
+my $fns = \@ARGV;
+
+###
+#
+# Compile through various stages:
+#
+###
+
+# convert streamit to java. 
+$fns = streamit_to_java($fns) unless $opts{tokopi};
+exit(1) if !$fns;
+
+# if --streamit flag to strc: 
+if ($opts{streamit}) {
+  $fns = java_to_streamit($fns);
+  exit(1) if !$fns;
+  # Stop now if no other backends were requested.
+  exit(0) unless non_streamit_backend_defined();
+
+  # Want both streamit output and compilation / library.
+  $fns = streamit_to_java($fns) unless $opts{tokopi};
+}
+exit(1) if !$fns;
+
+# --library requested: run in library and exit since this is compile & go. 
+if ($opts{'library'}) {
+    exit(1) if ! defined run_in_library($fns);
+    exit(0);
+}
+
+# generate c either from java(ish) or via tokopi/
+if ($opts{tokopi}) {
+    $fns = to_c_via_tokopi($fns)
+} else {
+    $fns = java_to_c($fns);
+}
+exit(1) if !$fns;
+
+# generate executable if possible
+if (! $opts{noexecutable}) {
+    my $executablename = $opts{output}  || "a.out";
+    if ($opts{simpleC} || $opts{uni}) {
+	$fns = c_to_out($fns, $executablename);
+	} elsif ($opts{cluster}) {
+	    $fns = cluster_to_out($fns, $executablename);
+	} else { print %opts; print "\n"; }
+}
+exit(1) if !$fns;
+exit(0);
+
+###
+# 
+# Back end defined (other than --streamit)?
+#
+# --streamit is odd case as can run through --streamit then through another
+# back end.
+#
+###
+
+sub non_streamit_backend_defined {
+    return $opts{library} || $opts{cluster} || $opts{raw} || $opts{rstream} ||
+	$opts{simpleC} || $opts{uni};
+}
+
+###
+# 
+# Back end defined?
+#
+###
+
+sub backend_defined {
+    return non_streamit_backend_defined() || $opts{streamit};
+}
+
+###
+#
+# Print help information
+#
+###
+
+sub usage
+  {
+    my ($fh, $more) = @_;
+    my $text = <<'EOT';
+strc: StreamIt compiler wrapper
+
+Usage: strc [options] file.str ...
+	
+ Options:
+  --help              Show this screen
+  --more-help         Include extra options
+* --much-more-help    Include internal-only options
+
+  --cluster n         Compile for a cluster or multicore with n nodes
+  --library           Run in the Java library instead of compiling
+  --simpleC           Use basic backend (not full-featured) to generate C output
+  --raw n, -r n       Compile for Raw, with an n-by-n grid
+  --rstream, -R       Generate C-like file to be compiled by RStream compiler 
+* --standalone, -S    Use Raw backend to generate C file for uniprocessor
+* --streamit          Output of the compiler is a StreamIt program
+* --uni               Compile for uniprocessor with C library (deprecated)
+    If none of the above, compile for uniprocessor. 
+
++ --memory, -Xmx      Specify Java heap limit (applies to library and compiler)
+* --noexecutable      Do not create an executable (for configurations that 
+*                     might otherwise)
+  --output, -o file   Write a binary to given filename
+  --verbose           Print commands as they are executed
+
+ Options available for all backends:
+  -O0, -O1, -O2       Use predefined optimization sets
+* --backendvalues     "package.class.field val ..." (Internal use only)
++ --destroyfieldarray Break arrays in structures into component elements
+* --clone-with-serialization
+*                     Use old serialization code to copy objects
++ --countops          Instrument to count arith ops (library, uniproc, cluster)
++ --debug             Output debugging information in the compiler
++ --fusion            Fuse entire program to a single filter
++ --fission n         Do vertical fission up to limit of argument
+  --iterations n,-i n Specify number of iterations to run
+* --havefftw          Declare that the sfftw libraries are available
+  --linearreplacement Perform linear transformations based on analysis
+* --linearreplacement2
+*                     Do linear replacement using a level of indirection
+* --linearreplacement3
+*                     Do linear replacement using diagonal replacement
++ --macros            Convert small functions to macros (inlining them)
++ --modfusion         Use wraparound buffers (vs. copying) for fusion
+* --nodatacollapse    Do not collapse splitjoins of data-parallel filters
+* --nolinearcollapse
+*                     Do not combine filters with linear replacement
+* --optfile class     Specify a user-defined Java class for transforming IR 
++ --print-partitioned-source
++                     Print StreamIt source after partitioning
+* --redundantreplacement
+*                     Create linear filters without redundant computation
+* --server            Run with "java -server", faster for large programs 
+*                     (default for library)
+* --sjtopipe          Convert split-joins to pipelines
+  --statespace        Use state-space representation for linear analyses
+* --stats             Gather statistics for program characterization
+* --tokopi            Use experimental frontend-to-SIR conversion
+* --sync              Turn on splitter/joiner coalescing (space/spacedynamic)
+  --unroll n, -u n    Specify loop unrolling limit
+
+ Options specific to Uniprocessor and Cluster backends:
+  --cacheopt          Optimize for cache sizes
+  --l1d n             Level 1 d-cache size in KB for --cacheopt (default 8)
+  --l1i n             Level 1 i-cache size in KB for --cacheopt (default 8)
+  --l2  n             Level 2 cache size in KB for --cacheopt (default 256)
+  --linearpartition, -L
+                      Automatically select targets of linear analyses
+* --numult            Do not increase multiplicity of partitions
+* --peekratio n       Expand filters so that (pops * n) >= (peeks - pops)
++ --profile           Add a timer for each filter body (cluster)
+
+ Options specific to Raw backend:
+  --asciifileio       Use ascii format for file I/O (also works on -simpleC)
++ --partition, -p     Automatically partition stream graph
++   --partition-dp       Dynamic programming partitioner (default)
++   --partition-greedy   Greedy partitioner (fuse lightest streams first)
++   --partition-greedier Greedier partitioner (fuse lightest filter pairs)
+* --decoupled         Generate dummy communication code
+* --dpscaling         Collect theoretical scaling statistics
+* --forceunroll       Force unroll to -u amount (even if overflows IMEM)
+* --magic-net, -M     Generate Raw "magic network" code
++ --manuallayout      Do not run simulated annealing for layout; 
++                     ask user for layout
+  --numbers n, -N     Automatically gather numbers and put in results.out
+  --ssoutputs n       With --numbers on a dynamic-rate app, specify n
+                      outputs per steady state.
+* --ratematch         Turn on rate matching
+  --rawcol n, -c n    Specify number of columns; --raw has number of rows
+* --removeglobals     Inline all functions and turn globals into locals
++ --simulatework, -s  Use simulator for work estimation
+* --space             Use space-only partitioner (deprecated)
+* --spacetime         Use space-time partitioner (experimental)
+  --wbs               Use work-based simulator for communication code
+* --steadymult n      For the SpaceTime Raw backend, multiply the steady-state
+*                     multiplicities by n
+* --slicethresh n     For the SpaceTime backend use n% for the slice work 
+*                     threshold
+* --noswpipe          For the SpaceTime backend, do not software pipeline the 
+*                     steady-state.
+* --hwic              When targeting the raw simulator, enable H/W icaching.
+* --greedysched       For the SpaceTime Backend, use a greedy bin packing
+*                     algorithm to calculate the schedule.
+* --workestunroll     For the SpaceTime Backend, perform unrolling on filters
+*                     for work estimation.
+* --autoparams        For the SpaceTime Backend, automatically calculate 
+*                     parameters.
+* --noswitchcomp      For the SpaceTime Backend, turn off switch instruction
+*                     compression.
+* --st_cyc_per_wd n   For the SpaceTime backend, define the bandwidth in
+*                     cycles per word for the streaming memories attached
+*                     to the raw chip.
+* --dup n             For the SpaceTime Backend, duplicate all stateless 
+*                     filters n times.
+* --malloczeros       For default backend, generate malloc instead of calloc 
+*                     (this malloc will zero)
+* --nopartition       For default backend, do not attempt to partition each 
+*                     static subgraph
+* --layoutfile f      For default backend, specify a layout file (a new-line 
+*                     separated list of tiles)
+* --devassignfile f   For default backend, specify a device-to-port assignment
+*                     file (a new-line separated list of tiles)
+*
+*Options specific to the RStream backend:
+* --absarray          Generate abstract arrays instead of C arrays (default)
+* --doloops           Generate doloops instead of for loops where possible 
+*                     (default)
++
++Options specific to Java library backend:
+* --norun             Schedule but do not run the program
++ --nosched           Run the program in pull mode, not under the scheduler
++ --marksteady        Print * after each steady-state execution
++ --printreps         Print number of times filters execute in schedule
++ --printsched        Print the full program schedule
+* --jcc               Use the JCC library (experimental)
+*
+*Options specific to deprecated uniprocessor backend:
+* --frequencyreplacement, -F
+*                     Convert FIR filters to frequency
+* --linearpartition, -L
+*                     Automatically select targets of linear analyses
+* --atlas             Use ATLAS for generated matrix multiplies
+* --poptopeek         Convert all pop expressions into peeks
+EOT
+    $text =~ s/^\*/ /mg if $more >= 2;
+    $text =~ s/^\+/ /mg if $more >= 1;
+    $text =~ s/^[*+].*\n//mg;
+    print $fh $text;
+}
+
+sub get_options
+  {
+    $opts{home} = $ENV{STREAMIT_HOME};
+    $opts{memory} = "1700M";
+    # Note: the exclamation points below indicate negatable options.  That is,
+    # for an option "myoption!", you can pass either "--myoption" or
+    # "--no-myoption" at the command line.  Only makes sense for boolean 
+    # options.
+    my $result = GetOptions(\%opts,
+			    "help",
+			    "more-help|help-more",
+			    "much-more-help|help-much-more",
+			    "output|o=s",
+			    "raw|r=i",
+			    "verbose|v",
+			    "optimize|O=i",
+			    "atlas!",
+			    "clone-with-serialization|clone_with_serialization",
+			    "countops!",
+			    "debug!",
+			    "decoupled",
+			    "dpscaling",
+			    "fission=i",
+			    "frequencyreplacement|F",
+			    "forceunroll",
+			    "fusion",
+			    "havefftw!",
+			    "iterations|i=i",
+			    "library!",
+			    "linearanalysis",
+			    "linearpartition|L",
+			    "linearreplacement",
+			    "linearreplacement2",
+			    "linearreplacement3",
+			    "magic-net|magic_net|M",
+			    "macros",
+			    "optfile=s",
+			    "memory|Xmx=s",
+			    "modfusion",
+			    "manuallayout",
+			    "nodatacollapse",
+			    "nolinearcollapse",
+			    "noexecutable",
+			    "norun",
+			    "nosched",
+			    "numbers|N=i",
+			    "partition|p",
+			    "partition-dp|pdp",
+			    "partition-greedy|pgreedy",
+			    "partition-greedier|pgreedier",
+			    "poptopeek",
+			    "marksteady!",
+			    "printreps!",
+			    "printsched!",
+			    "print-partitioned-source|print_partitioned_source",
+			    "profile!",
+			    "ratematch",
+			    "rawcol|c=i",
+			    "redundantreplacement",
+			    "removeglobals",
+			    "simulatework|s",
+			    "sjtopipe",
+			    "space",
+			    "spacetime",
+			    "statespace!",
+			    "absarray!",
+			    "doloops!",
+			    "standalone|S",
+			    "rstream|R",
+			    "simpleC",
+			    "server!",
+			    "stats!",
+			    "streamit",
+			    "sync",
+			    "tokopi!",
+			    "uni",
+			    "unroll|u=i",
+			    "wbs!",
+			    "noswpipe",
+			    "noswitchcomp",
+			    "autoparams",
+			    "hwic",
+			    "greedysched",
+			    "workestunroll",
+			    "cluster=i",
+			    "steadymult=i",
+			    "slicethresh=i",
+			    "st_cyc_per_wd=i",
+			    "dup=i",
+			    "ssoutputs=i",
+			    "asciifileio",
+			    "malloczeros!",
+			    "nopartition",
+			    "layoutfile=s",
+			    "devassignfile=s",
+			    "destroyfieldarray!",
+			    "cacheopt!",# no documentation
+			    "nomult!",  # no documentation
+			    "peekratio=i", # no documentation
+			    "backendvalues|bevals=s",
+			    "jcc");
+    return $result if !$result;
+
+    # determine back-end:
+    
+    # if no backend specified, then cluster -1
+    backend_defined() || ($opts{cluster} = 1 && $opts{standalone} = 1);
+
+    # if simpleC specified then rstream, ignoring ignore doloops, absarray
+    if ($opts{simpleC}) {
+	$opts{doloops} = 0;
+	$opts{absarray} = 0;
+    }
+
+    if (! defined($opts{havefftw})) {
+	if ($have_fftw) {
+	    $opts{havefftw} = 1;
+	}
+    }
+    
+    # if targetting more than one cluster host, then turn on partitioning
+    if ($opts{cluster} && !$opts{standalone}) {
+        $opts{partition} = 1;
+    }
+
+    # Figure out which partitioning is in use, if any:
+    $opts{partition} = "greedier" if $opts{'partition-greedier'};
+    $opts{partition} = "greedy" if $opts{'partition-greedy'};
+    $opts{partition} = "dp" if $opts{'partition-dp'};
+    # Default to DP partitioning, if we've selected partitioning
+    # but none of these options.
+    $opts{partition} = "dp" if $opts{partition} &&
+      !grep {$opts{partition} eq $_} ('dp', 'greedy', 'greedier');
+
+    # If the user specified -O#, transform that into appropriate options,
+    # but don't override things otherwise on the command line.
+    
+    if (exists $opts{optimize})
+      {
+	if ($opts{optimize} >= 2)
+	  {
+	    $opts{unroll} = 256 unless exists $opts{unroll};
+	    $opts{partition} = "dp" unless $opts{partition};
+            # macros don't work yet in the cluster backend
+            $opts{macros} = 1 unless (exists $opts{macros} || exists $opts{cluster});
+	  }
+	if ($opts{optimize} >= 1)
+	  {
+	    $opts{unroll} = 16 unless exists $opts{unroll};
+	    $opts{wbs} = 1 unless exists $opts{wbs};
+	    $opts{destroyfieldarray} = 1 unless
+	      exists $opts{destroyfieldarray};
+	    $opts{partition} = "dp" unless $opts{partition};
+	  }
+	if ($opts{optimize} >= 0)
+	  {
+	    $opts{unroll} = 0 unless exists $opts{unroll};
+	  }
+      }
+
+    return 1;
+  }
+
+sub call
+  {
+    my ($cmd) = @_;
+    print "$cmd\n" if $opts{verbose};
+    my $result = system($cmd);
+    if ($opts{verbose} && $result != 0)
+      {
+	if (WIFSIGNALED($?))
+	  {
+	    print "(exited with signal " . WTERMSIG($?) . ")\n";
+	  }
+	else
+	  {
+	    print "(exited with value " . WEXITSTATUS($?) . ")\n";
+	  }
+      }
+    return $result;
+  }
+
+sub change_extension
+  {
+    my ($old, $from, $to) = @_;
+    my $fn = $old;
+    $fn =~ s/.$from$//;
+    $fn .= ".$to";
+    return $fn;
+  }
+
+sub remove_extension
+  {
+    my ($old, $from) = @_;
+    my $fn = $old;
+    $fn =~ s/.$from$//;
+    return $fn;
+  }
+
+###
+#
+# Convert StreamIt to java (library) or java_ish (compilers)
+#
+# returning array containing first file name with .java extension if
+# compilation successful, undef if compilation unsuccessful, and empty
+# array if asked to compile 0 files. 
+#
+###
+
+sub streamit_to_java
+  {
+    my ($fns) = @_;
+    return [] if !@$fns;
+    my $xmx = "-Xmx" . $opts{memory};
+    my $server = $opts{server} ? "-server" : "";
+    my $target = change_extension($fns->[0], "str", "java");
+    my $libflag = "";
+    $libflag = "--library" if $opts{library};
+    my $opsflag = "";
+    # only tell the frontend to profile on the library path.
+    # Otherwise, the compiler gets the profile flag.
+    $opsflag = "--countops" if $opts{countops} && $opts{library};
+    my $result = call("$java $xmx $server streamit.frontend.ToJava --output $target " .
+		      "$libflag $opsflag " . join(' ', @$fns));
+    return undef if $result != 0;
+    return [$target];
+  }
+
+
+###
+#
+# Convert a java file to StreamIt.
+# converts foo1.java ... fooN.java to foo1_c.str
+#
+# More useful: if you started with foo1.str ... fooN.str, then 
+# streamit_to_java followed by java_to_streamit gets you foo1_c.str
+# which may show effects of optimizations: result of strc --steamit
+#
+# TODO: does not work followed by another backend since SIRToStreamit changed 
+# to output on stderr as a code dumper.  Need additional flag to SIRToStreamit
+# to say: dump to stdout. 
+#
+###
+
+sub java_to_streamit
+  {
+    my ($fns) = @_;
+    return [] if !@$fns;
+    my $xmx = "-Xmx" . $opts{memory};
+    my $server = $opts{server} ? "-server" : "";
+    my $jfiles = join(' ', @$fns);
+    my $target = change_extension($fns->[0], "java", "str");
+    # Add "_c" to the basename.
+    $target =~ s/^([^.]*)/$1_c/;
+    my $result = call("$java $xmx $server at.dms.kjc.Main --streamit " .
+		      "--backend at.dms.kjc.sir.SIRToStreamIt " .
+		      "$compiler_opts $jfiles > $target");
+    return undef if $result != 0;
+    return [$target];
+  }
+
+###
+#
+# Use requested backend to produce C / C++ code
+#
+###
+
+sub java_to_c
+  {
+    my ($fns) = @_;
+    return [] if !@$fns;
+    my $xmx = "-Xmx" . $opts{memory};
+    my $server = $opts{server} ? "-server" : "";
+    my $jfiles = join(' ', @$fns);
+    if ($opts{uni})	     # uni backend writes to stdout: TODO fix some day
+      {
+	my $target = change_extension($fns->[0], "java", "c");
+	$target = $opts{output} . ".c" if $opts{outputs};
+	my $result = call("$java $xmx $server at.dms.kjc.Main --streamit $compiler_opts " .
+			  "$jfiles > $target");
+	return undef if $result != 0;
+	return [$target];
+      }
+    else
+      {
+	my $result = call("$java $xmx $server at.dms.kjc.Main --streamit $compiler_opts $jfiles");
+	return undef if $result != 0;
+	# TODO: implement --output flags to all backends.
+	return ["Makefile.streamit"] if $opts{cluster};	# makes multiple cpp files
+	return ["tile0.c"] if $opts{raw} && $opts{standalone};
+	return ["str.c"] if $opts{simpleC} || $opts{rstream};
+	return [];
+      }
+  }
+
+###
+#
+# un-supported translation using to-kopi.
+#
+###
+
+sub streamit_via_tokopi
+  {
+    my ($fns) = @_;
+    return [] if !@$fns;
+    my $xmx = "-Xmx" . $opts{memory};
+    my $server = $opts{server} ? "-server" : "";
+    my $sfiles = join(' ', @$fns);
+    my $result;
+    if (!$opts{raw} && !$opts{cluster})
+      {
+	my $target = change_extension($fns->[0], "str", "c");
+	$target = $opts{output} . ".c" if $opts{output};
+	$result = call("$java $xmx $server streamit.frontend.ToKopi $compiler_opts $sfiles > $target");
+	return undef if $result != 0;
+	return [$target];
+      }
+    else
+      {
+	$result = call("$java $xmx $server at.dms.kjc.Main --streamit $compiler_opts $sfiles");
+	return undef if $result != 0;
+	return [];
+      }
+  }
+
+###
+#
+# "library" back end: Compile java file from front end and run. 
+#  (must call streamit_to_java first).
+#
+###
+
+sub run_in_library
+  {
+    my ($fns) = @_;
+    return if !@$fns;
+    my @out = ();
+    my $xmx = "-Xmx" . $opts{memory};
+    my $server = $opts{server} ? "-server" : "";
+    my $result;
+    foreach my $jfile (@$fns)
+      {
+	  my $class = remove_extension($jfile, "java");
+	  $result = call("$javac $jfile");
+	  return undef if $result != 0;
+	  $result = call("$java $xmx $server $class " . get_lib_opts());
+#	  $result = call("$java -Xrunhprof:cpu=samples,heap=all $xmx $server $class " . get_lib_opts());
+	  return undef if $result != 0;
+      }
+    return [];
+  }
+
+
+###
+#
+# Take output of --simpleC or --uni and create executable.
+#
+# eventually expand to create output for --cluster 1 -standalone (TODO) 
+#
+###
+
+sub c_to_out
+  {
+    my ($fns, $target) = @_;
+    return [] if !@$fns;
+    my $tfn = $target || "a.out";
+    $target = $target ? "-o$target" : ""; # but never undef
+    my $sh = $opts{home};
+    my ($gcc, $libs);
+
+    $gcc = "$cc";
+    my $ccflags  = "-O2";
+    my $incflags = "";
+    my $libflags = "";
+
+    if ($opts{simpleC}) 
+    {
+	  $libs .= " -lm";
+    }
+    else 
+    {
+	  $incflags = "-L$sh/library/c";
+	  $libflags = "-I$sh/library/c";
+
+	  if ($opts{profile})
+	  {
+		$gcc  .= " -pg -a";
+		$libs .= " -nodefaultlibs -lstreamit_p";
+		$libs .= " -lsrfftw -lssftw" if $opts{havefftw};
+		$libs .= " -lm_p -lc_p -lgcc";
+	  }
+	  else {
+		$libs .= " -lstreamit";
+		$libs .= " -lsrfftw -lsfftw" if $opts{havefftw};
+		$libs .= " -lm";
+	  }
+    }
+
+    my $result = call("$gcc $ccflags $target " . join(' ', @$fns) . " $incflags $libflags $libs");
+    return undef if $result != 0;
+    return [$tfn];
+  }
+
+###
+#
+# Take output of --cluster and create executable.
+#
+###
+
+sub cluster_to_out {
+    my ($fns, $target) = @_;
+    #return [] if !@$fns;
+    call("$rm $target") if -e $target; 	# remove existing output file if any.
+    my $result = call("$make -f Makefile.cluster");
+    return undef if $result != 0;
+    return undef unless -e $target;
+    return [$target];
+}
+
+###
+#
+# Get and mung options to pass to compiled backends
+#
+###
+
+sub get_compiler_opts
+  {
+    my $copts = "";
+    $opts{raw} && ($copts .= " -raw " . $opts{raw});
+    $opts{raw} && $opts{spacetime} && ($copts .= " --spacetime");
+    $opts{raw} && $opts{space} && ($copts .= " --space");
+    $opts{raw} && !$opts{spacetime} && !$opts{space} && ($copts .= " --spacedynamic");
+    if (exists $opts{partition})
+      {
+	$opts{partition} eq 'dp' && ($copts .= " --partition_dp");
+	$opts{partition} eq 'greedy' && ($copts .= " --partition_greedy");
+	$opts{partition} eq 'greedier' && ($copts .= " --partition_greedier");
+      }
+    $opts{atlas} && ($copts .= " --atlas");
+    $opts{'clone-with-serialization'} && ($copts .= " --clone_with_serialization");
+    $opts{countops} && ($copts .= " --countops");
+    $opts{debug} && ($copts .= " --debug");
+    $opts{asciifileio} && ($copts .= " --asciifileio");
+    $opts{decoupled} && ($copts .= " --decoupled");
+    $opts{dpscaling} && ($copts .= " --dpscaling");
+    $opts{forceunroll} && ($copts .= " --forceunroll");
+    $opts{frequencyreplacement} && ($copts .= " --frequencyreplacement");
+    $opts{fission} && ($copts .= " --fission " . $opts{fission});
+    $opts{fusion} && ($copts .= " --fusion");
+    $opts{linearanalysis} && ($copts .= " --linearanalysis");
+    $opts{linearpartition} && ($copts .= " --linearpartition");
+    $opts{linearreplacement} && ($copts .= " --linearreplacement");
+    $opts{linearreplacement2} && ($copts .= " --linearreplacement2");
+    $opts{linearreplacement3} && ($copts .= " --linearreplacement3");
+    $opts{'magic-net'} && ($copts .= " --magic_net");
+    $opts{macros} && ($copts .= " --macros ");
+    $opts{optfile} && ($copts .= " --optfile " . $opts{optfile});
+    $opts{modfusion} && ($copts .= " --modfusion");
+    $opts{manuallayout} && ($copts .= " --manuallayout");
+    $opts{nodatacollapse} && ($copts .= " --nodatacollapse");
+    $opts{nolinearcollapse} && ($copts .= " --nolinearcollapse");
+    $opts{numbers} && ($copts .= " --numbers " . $opts{numbers});
+    !$opts{raw} && $opts{iterations} && 
+	($copts .= " --i " . $opts{iterations});
+    $opts{raw} && $opts{iterations} &&
+	($copts .= " --outputs " . $opts{iterations});
+    $opts{output} && ($copts .= " --output " . $opts{output});
+    $opts{poptopeek} && ($copts .= " --poptopeek");
+    $opts{'print-partitioned-source'} && ($copts .= " --print_partitioned_source");
+    $opts{profile} && ($copts .= " --profile");
+    $opts{ratematch} && ($copts .= " --ratematch");
+    $opts{rawcol} && ($copts .= " --rawcol ". $opts{rawcol});
+    $opts{standalone} && ($copts .= " --standalone");
+    $opts{rstream} && ($copts .= " --rstream --doloops --absarray");
+    $opts{simpleC} && ($copts .= " --rstream");
+    $opts{removeglobals} && ($copts .= " --removeglobals");
+    $opts{simulatework} && ($copts .= " --simulatework");
+    $opts{sjtopipe} && ($copts .= " --sjtopipe");
+    $opts{statespace} && ($copts .= " --statespace");
+    $opts{stats} && ($copts .= " --stats");
+    $opts{sync} && ($copts .= " --sync");
+    defined $opts{unroll} && ($copts .= " --unroll " . $opts{unroll});
+    $opts{cluster} && ($copts .= " --cluster " . $opts{cluster});
+    $opts{destroyfieldarray} && ($copts .= " --destroyfieldarray");
+    $opts{cacheopt} && ($copts .= " --cacheopt");
+    $opts{nomult} && ($copts .= " --nomult");
+    $opts{peekratio} && ($copts .= " --peekratio " . $opts{peekratio});
+    $opts{wbs} && ($copts .= " --wbs");
+    $opts{noswpipe} && ($copts .= " --noswpipe");
+    $opts{hwic} && ($copts .= " --hwic");
+    $opts{greedysched} && ($copts .= " --greedysched");
+    $opts{workestunroll} && ($copts .= " --workestunroll");
+    $opts{noswitchcomp} && ($copts .= " --noswitchcomp");
+    $opts{autoparams} && ($copts .= " --autoparams");
+    $opts{spacetime} && ($copts .= " --spacetime");
+    $opts{space} && ($copts .= " --space");
+    $opts{absarray} && ($copts .= " --absarray");
+    $opts{doloops} && ($copts .= " --doloops");
+    $opts{forceplacement} && ($copts .= " --forceplacement");
+    $opts{malloczeros} && ($copts .= " --malloczeros");
+    $opts{nopartition} && ($copts .= " --nopartition");
+    $opts{steadymult} && ($copts .= " --steadymult ". $opts{steadymult});
+    $opts{slicethresh} && ($copts .= " --slicethresh ". $opts{slicethresh});
+    $opts{st_cyc_per_wd} && ($copts .= " --st_cyc_per_wd ". $opts{st_cyc_per_wd});
+    $opts{dup} && ($copts .= " --dup ". $opts{dup});
+    $opts{ssoutputs} && ($copts .= " --ssoutputs ". $opts{ssoutputs});
+    $opts{layoutfile} && ($copts .= " --layoutfile ". $opts{layoutfile});
+    $opts{devassignfile} && ($copts .= " --devassignfile ". $opts{devassignfile});
+    $opts{backendvalues} && ($copts .= " --backendvalues \"". $opts{backendvalues}. "\"");
+    $opts{havefftw} && ($copts .= " --havefftw");
+    return $copts;
+}
+
+###
+#
+# Get (and mung) options to pass to library
+#
+###
+
+sub get_lib_opts
+  {
+    my $libopts = '';
+    $opts{iterations} && ($libopts .= " -i " . $opts{iterations});
+    $opts{nosched} && ($libopts .= " -nosched");
+    $opts{norun} && ($libopts .= " -norun");
+    $opts{marksteady} && ($libopts .= " -marksteady");
+    $opts{printsched} && ($libopts .= " -printsched");
+    $opts{printreps} && ($libopts .= " -printreps");
+    $opts{jcc} && ($libopts .= " -jcc");
+    return $libopts;
+  }

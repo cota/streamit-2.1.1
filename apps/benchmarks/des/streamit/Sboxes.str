@@ -1,0 +1,38 @@
+// Performs sbox permutations for DES encryption
+// (rodric rabbah, <rabbah@mit.edu>)
+
+bit->bit splitjoin Sboxes()
+{
+    split roundrobin(6);
+    
+    for (int i = 1; i <= 8; i++) {
+        if (i == 1) add Sbox(S8); // lower 8 bits
+        if (i == 2) add Sbox(S7); // next  8 bits
+        if (i == 3) add Sbox(S6); // ...
+        if (i == 4) add Sbox(S5);
+        if (i == 5) add Sbox(S4);
+        if (i == 6) add Sbox(S3);
+        if (i == 7) add Sbox(S2);
+        if (i == 8) add Sbox(S1); // last (upper) 8 bits
+    }
+
+    join roundrobin(4);
+}
+
+bit->bit filter Sbox(int[4][16] table)
+{
+    work push 4 pop 6 {
+        int r = pop(); // r = first and last bit
+        int c = pop(); // c = middle four bits
+        c = (pop() << 1) | c;
+        c = (pop() << 2) | c;
+        c = (pop() << 3) | c;
+        r = (pop() << 1) | r;
+
+        int out = table[r][c];
+        push((bit)((out & 0x1) >> 0));
+        push((bit)((out & 0x2) >> 1));
+        push((bit)((out & 0x4) >> 2));
+        push((bit)((out & 0x8) >> 3));
+    }
+}

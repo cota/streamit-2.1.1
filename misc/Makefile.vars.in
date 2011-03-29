@@ -1,0 +1,33 @@
+# Makefile.vars.in: Autoconf-detected program locations
+# Create Makefile.vars by running $(STREAMIT_HOME)/configure
+# 
+# Every program that we use in the tool chain should appear here.
+# 
+# $(STREAMIT_HOME)/configure.in whould be updated whenever you add or remove
+# a tool from this file.
+#
+# Every Makefile in the tool chain should:
+#  include $(STREAMIT_HOME)/misc/Makefile.vars
+
+# AUTOCONFISCATE VAR = @VAR@
+CC = @CC@
+CXX = @CXX@
+JAVA = @JAVA@
+JAVAC = @JAVAC@
+SED = @SED@
+FIND = @FIND@
+MAKE = @MAKE@
+AR = @AR@
+RANLIB = @RANLIB@
+XARGS = @XARGS@
+LATEX = @LATEX@
+BIBTEX = @BIBTEX@
+DVIPS = @DVIPS@
+MPOST = @MPOST@
+PS2PDF = @PS2PDF@
+HEVEA = @HEVEA@
+IMAGEN = @IMAGEN@
+PERL = @PERL@
+CAG_BUILD = @CAG_BUILD@
+HAVE_FFTW = @HAVE_FFTW@
+# END AUTOCONFISCATE

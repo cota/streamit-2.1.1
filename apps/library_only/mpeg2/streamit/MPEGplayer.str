@@ -1,0 +1,45 @@
+/*
+ * Copyright 2005 by the Massachusetts Institute of Technology.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software and its documentation for any purpose and without
+ * fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright
+ * notice and this permission notice appear in supporting
+ * documentation, and that the name of M.I.T. not be used in
+ * advertising or publicity pertaining to distribution of the
+ * software without specific, written prior permission.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is"
+ * without express or implied warranty.
+ */
+
+/**
+ * @description
+ * This file contains a sample MPEG player which will play back a
+ * video file. It uses a number of experimental features and will
+ * probably only run in the library.
+ *
+ * @author <a href="mailto:madrake@gmail.com">Matthew Drake</a>
+ * @file MPEGplayer.str
+ * @version 1.0
+ */
+
+void->void pipeline MPEGplayer() {
+    // For compiling outside the library, if support has not yet been added for FileReader<bit>
+    // substitute the following, which will cause a slight performance hit.
+    // add FileReader<int>("../input/cact_015.m2v");
+    // add IntStream2BitStream();
+
+    //    add FileReader<bit>("./output.m2v"); // Output of the in-progress MPEG-encoder
+    //  add FileReader<bit>("../input/nomessage.m2v"); // Use this one for the nomessage decoder
+    add FileReader<bit>("../input/cact_015.m2v"); // A normal MPEG-2 video for the decoder
+    //  add FileReader<bit>("../input/test.m2v"); // A 4:2:2 chroma format video
+    int width=352;  // Hacked till we have reprogrammable splitjoins FEATURETODO
+    int height=240;
+    int the_chroma_format = 1; // 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4 (not supported)
+
+    add MPEGStream_to_rawImageStream(width, height, the_chroma_format);
+
+    add ImageDisplay(width, height);
+}

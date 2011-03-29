@@ -1,0 +1,167 @@
+/*
+ * Copyright 2005 by the Massachusetts Institute of Technology.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software and its documentation for any purpose and without
+ * fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright
+ * notice and this permission notice appear in supporting
+ * documentation, and that the name of M.I.T. not be used in
+ * advertising or publicity pertaining to distribution of the
+ * software without specific, written prior permission.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is"
+ * without express or implied warranty.
+ */
+
+/**
+ * @description
+ * This file contains various functions that are used by a variety of
+ * other stream components.
+ *
+ * @author <a href="mailto:madrake@gmail.com">Matthew Drake</a>
+ * @file Misc.str
+ * @version 1.0
+ */
+
+/*
+ * Saturates a stream of integers known to lie within some larger
+ * range, forcing them to lie within a specified range. Values greater
+ * than the maximum are saturated to have the max value, and values
+ * less than the minimum are saturated to have the minimum value. If a
+ * value lies outside of the great range behavior is undefined.
+ *
+ * Depending on the size of the range, dispatches to either the
+ * general saturation procedure or the array-lookup saturation.
+ *
+ * @param min The minimum value any integer in the stream is allowed to assume.
+ * @param max The maximum value any integer in the stream is allowed to assume.
+ * @param worst_input_min The absolute minimum value any input could ever take on.
+ * @param worst_input_max The absolute maximum value any input could ever take on.
+ * @input A stream of integers.
+ * @output A stream of integers lying between min and max, inclusive.
+ */
+int->int pipeline BestSaturation(int min, int max, int worst_input_min, int worst_input_max) {
+    // we know:
+    //  - range of <= 521  does better with bounded saturation
+    //  - range of >= 1024 does better with plain saturation
+    int range = worst_input_max - worst_input_min + 1;
+    if (range < 600) {
+        add BoundedSaturation(min, max, worst_input_min, worst_input_max);
+    } else {
+        add Saturation(min, max);
+    }
+}
+
+/**
+ * Saturates a stream of integers, forcing them to lie within a specified range. Values
+ * greater than the maximum are saturated to have the max value, and values less than the
+ * minimum are saturated to have the minimum value.
+ * @param min The minimum value any integer in the stream is allowed to assume.
+ * @param max The maximum value any integer in the stream is allowed to assume.
+ * @input A stream of integers.
+ * @output A stream of integers lying between min and max, inclusive.
+ */
+int->int filter Saturation(int min, int max) {
+    work pop 1 push 1 {
+        int val = pop();
+        if (val > max) {
+            push(max); 
+        } else if (val < min) {
+            push(min);
+        } else {
+            push(val);
+        }
+    }
+}
+
+/**
+ * Saturates a stream of integers known to lie within some larger range, 
+ * forcing them to lie within a specified range. Values
+ * greater than the maximum are saturated to have the max value, and values less than 
+ * the minimum are saturated to have the minimum value. If a value lies outside
+ * of the great range behavior is undefined.
+ * @param min The minimum value any integer in the stream is allowed to assume.
+ * @param max The maximum value any integer in the stream is allowed to assume.
+ * @param worst_input_min The absolute minimum value any input could ever take on.
+ * @param worst_input_max The absolute maximum value any input could ever take on.
+ * @input A stream of integers.
+ * @output A stream of integers lying between min and max, inclusive.
+ */
+int->int filter BoundedSaturation(int min, int max, int worst_input_min, int worst_input_max) {
+    int range;
+    int[2*(worst_input_max - worst_input_min + 1)] saturate; // TODO - fix static variables propogating in library
+    init {
+        range = worst_input_max - worst_input_min + 1; // Should come earlier but range not set correctly
+        for (int i = 0; i < range*2; i++) {
+            int val = i + worst_input_min;
+            if (val < min) {
+                saturate[i] = min;
+            } else if (val > max) {
+                saturate[i] = max;
+            } else {
+                saturate[i] = val;
+            }
+        }   
+    }
+    work pop 1 push 1 {
+        push(saturate[pop()-worst_input_min]);
+    }
+}
+
+/** 
+ * Duplicates a sequence of data items a given number of times.
+ * @param numitems The number of items in a sequence.
+ * @param numtimes The number of times the sequence should be repeated.
+ * @input A sequence of numitems values.
+ * @output A sequence of numitems values repeated numtimes.
+ */
+/*
+int->int splitjoin Repeat(int numitems, int numtimes) {
+  split duplicate;
+  for (int i = 0; i < numtimes; i++)
+    add Identity<int>;
+  join roundrobin(numitems);
+}
+*/
+
+int->int filter Repeat(int numitems, int numtimes) {
+
+    work pop numitems push numitems * numtimes {
+        int[numitems] dataArray;
+        for (int i = 0; i < numitems; i++) {
+            dataArray[i] = pop();
+        }
+        for (int j = 0; j < numtimes; j++) {
+            for (int i = 0; i < numitems; i++) {
+                push(dataArray[i]);
+            }
+        }
+    }
+}
+
+
+/** 
+ * Divide every value in the stream by a given number, truncating to the nearest
+ * integer.
+ * @param div The denominator in the division.
+ * @input An integer
+ * @output An integer related to the input by output = floor(input / div)
+ */
+int->int filter DivideBy(int div) {
+    work pop 1 push 1 {
+        push(pop()/div);
+    }
+}
+
+/**
+ * @internal
+ */
+int->int filter Add(int num) {
+    work pop num push 1 {
+        int sum = 0;
+        for (int i = 0; i < num; i++)
+            sum += pop();
+        push(sum);
+    }
+}

@@ -1,0 +1,101 @@
+
+/**
+   
+This code is used for decoupled mode and for filter work estimation 
+profiling on the simulator.  It catches magic instructions that are 
+generated in the c tile code that demark the beginning and end of 
+one execution of a filter.  When the filter begins it prints a 0 and
+when it finishes it prints a 1.  When all filters have executed 
+at exactly once, the simulation ends and prints the cycle count for 
+each filter.
+
+*/
+
+global gWorkArray;
+global gFinished;
+global outputFile;
+
+
+fn work_est_init()
+{
+  local i;
+
+  //open the file to dump the data to
+  outputFile = fopen("work_est.out", "w");
+  //local ntiles = gXSize*gYSize
+  //allocate some shit, gStreamItFilterTiles
+  gFinished = 0;
+  gWorkArray = malloc(gNumProc*4);
+  for (i = 0; i < gNumProc; i++) {
+    gWorkArray[i] = -1;
+  }
+
+  //register the magic instruction
+  listi_add(get_variable_val("gMagicInstrHMS").theList, 
+	    & fn (procNum, rs, imm, result_ptr)
+  {
+    return work_est(procNum, rs, imm, result_ptr);
+  });
+}
+
+
+fn work_est(procNum, rs, imm, result_ptr)
+{
+  local proc, time_hi, time_lo;
+  if (imm != 21 && imm != 22)
+    return 0;
+  
+  //get the proc
+  proc = Machine_GetProc(machine, procNum);
+  //get the cycle
+  Proc_GetCycleCounter(proc, &time_hi, &time_lo);
+  
+  if (imm == 21) {  //print an int
+    printf("[%d: %d]: %d\n", procNum, time_lo, rs);
+    
+    if (rs == 0) {
+      gWorkArray[procNum] = time_lo;
+    }
+    else if (rs == 1) {
+      local start_time = gWorkArray[procNum];
+      
+      gFinished++;
+      gWorkArray[procNum] = time_lo - start_time;
+      
+      if (gFinished == gStreamItFilterTiles) {
+	print_final_stats();
+	//this should exit!!!!!
+	gInterrupted = 1;
+	//this will exit the thread
+	exit_now(0);
+      }
+    }
+  }
+  else {   
+    printf("Invalid value printed in decoupled mode\n");
+    gInterrupted = 1;
+    //this will exit the thread
+    exit_now(0);
+  }
+  return 1;
+}
+
+fn print_final_stats() {
+  local i;
+  local tileNum = 0;
+  
+  listi_walk_begin(gFilterNames);
+  for (i = 0; i < gNumProc; i++) {
+    if (gWorkArray[i] != -1) {
+      fprintf(outputFile,"%d cycles for TileNum %d, %s\n", 
+	      gWorkArray[i],tileNum, listi_walk_current_val(gFilterNames));
+      listi_walk_next(gFilterNames);
+    }
+    tileNum++;
+  }
+  fclose(outputFile);
+}
+
+fn getTileNum(x, y) {
+  return (x*gYSize) + y;
+}

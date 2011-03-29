@@ -1,0 +1,102 @@
+/*
+ * Copyright 2005 by the Massachusetts Institute of Technology.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software and its documentation for any purpose and without
+ * fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright
+ * notice and this permission notice appear in supporting
+ * documentation, and that the name of M.I.T. not be used in
+ * advertising or publicity pertaining to distribution of the
+ * software without specific, written prior permission.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is"
+ * without express or implied warranty.
+ */
+
+/**
+ * @description
+ * This file contains components for converting between various different
+ * color spaces.
+ *
+ * @author <a href="mailto:madrake@gmail.com">Matthew Drake</a>
+ * @file ColorSpace.str
+ * @version 1.0
+ */
+
+int->int pipeline ColorSpaceConversion_YCbCrtoRGB {
+    add YCbCrtoRGB;
+    add BestSaturation(0, 255, -384, 639);
+    // See mpeg2dec in the reference implementation, Clip[]
+}
+
+int->int pipeline ColorSpaceConversion_RGBtoYCbCr {
+    add RGBtoYCbCr;
+}         
+
+
+/**
+ * Converts a pixel in RGB format to a pixel in YCbCr format according to Recommendation
+ * ITU-R BT.709 for color space transformations. This is the default transformation that should
+ * be used for MPEG-2 videos. This transformation is given in Table 6-9 on P.47 of the MPEG-2 13818-2
+ * IEEE specification (entry #1). 
+ * @input Three integers in RGB color space and order.
+ * @output Three integers in YCbCr color space and order.
+ */
+int->int filter RGBtoYCbCr {
+    work pop 3 push 3 {
+        int R = pop();
+        int G = pop();
+        int B = pop();
+
+        float ER = ((float) R)/256.0;
+        float EG = ((float) G)/256.0;
+        float EB = ((float) B)/256.0;
+
+        float Ey =   0.715400*EG + 0.072100*EB + 0.212500*ER;
+        float Epb = -0.386000*EG + 0.500000*EB - 0.115000*ER;
+        float Epr = -0.454000*EG - 0.046000*EB + 0.500000*ER;
+
+        int Y = (int) round((219*Ey) + 16);
+        int Cb = (int) round((224*Epb) + 128);
+        int Cr = (int) round((224*Epr) + 128);
+
+        // My values are centered between +/- 128 and it outputs values in the
+        // 0 to 255 range, so we compute and then subtract.
+
+        push(Y-128);
+        push(Cb-128);
+        push(Cr-128);
+    }
+}
+
+/**
+ * Converts a pixel in YCbCr format to a pixel in RGB format according to Recommendation
+ * ITU-R BT.709 for color space transformations. This is the default transformation that should
+ * be used for MPEG-2 videos. This transformation is given in Table 6-9 on P.47 of the MPEG-2 13818-2
+ * IEEE specification (entry #1). The recommendation specifies the transform from RGB to YCbCR. This
+ * function's transformation coefficients were calculated using MATLAB and an inverse matrix transform
+ * based on the RGB to YCbCr conversion.
+ * @input Three integers in YCbCr color space and order.
+ * @output Three integers in RGB color space and order.
+ */
+int->int filter YCbCrtoRGB {
+    // My values are centered between +/- 128, and it expects values in the 
+    // 0 to 255 range, so we add first and then compute.
+    // Saturation of the output is performed downstream.
+
+    work pop 3 push 3 {
+
+        int Y = 76309 * (pop() + 112);
+        int U = pop();
+        int V = pop();
+        int R = (Y + 117504*V + 32768)>>16;
+        int G = (Y - 13954*U - 34903*V + 32768)>>16;
+        int B = (Y + 138453*U + 32786)>>16;
+
+        push(R);
+        push(G);
+        push(B);
+
+    }
+}

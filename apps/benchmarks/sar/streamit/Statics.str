@@ -1,0 +1,51 @@
+// Code adapted FROM getUserParameters.m and getSARparams*.m
+// (rodric rabbah, <rabbah@mit.edu>)
+
+static {
+    float PI  = 3.14159265358979;
+    float PI2 = 2 * PI;
+
+    // getUserParameters.m
+    float SCALE_FACTOR = 1.0;
+    
+    // getSARparams0.m
+    float ASPECT_RATIO = 0.4;
+    float RANGE_FACTOR = 10.0;
+    
+    /* synthetic aperture is 2*L */
+    float L = 100 * SCALE_FACTOR;
+    
+    /* target area in cross-range is within */
+    float Y0 = L;
+
+    /* target area in range is within [Xc-X0,Xc+X0] */
+    float X0 = Y0 * ASPECT_RATIO;
+
+    /* range distance to center of target area */
+    float Xc = Y0 * RANGE_FACTOR;                
+
+    // getSARparams.m
+    float RELATIVE_BANDWIDTH = 0.5;
+    int   RPULSE = 75;
+
+    /* propagation speed */
+    float c = 3e8;
+
+    /* carrier frequency */
+    float fc = 400e6;
+
+    /* spatial/geometric parameters */
+    float Rmin = Xc - X0;
+    float Rmax = sqrt(((Xc + X0)*(Xc + X0)) + ((Y0 + L)*(Y0 + L)));
+
+    /* chirp pulse duration */
+    float Tp = RPULSE / c;    
+
+    /* baseband bandwidth */
+    float f0 = 0.5 * RELATIVE_BANDWIDTH * fc;
+
+    /* wavelength at highest frequency */
+    float lambda_min = c / (fc + f0);
+
+    init {}
+}

@@ -1,0 +1,23 @@
+void->void pipeline Fib {
+    add feedbackloop {
+	join roundrobin(0, 1);
+	body PeekAdd();
+	loop Identity<int>();
+	split duplicate;
+	enqueue 0;
+	enqueue 1;
+    };
+    add IntPrinter();
+}
+
+int->int filter PeekAdd {
+    work push 1 pop 1 peek 2 {
+	push(peek(1) + pop());
+    }
+}
+
+int->void filter IntPrinter {
+    work pop 1 {
+	println(pop());
+    }
+}

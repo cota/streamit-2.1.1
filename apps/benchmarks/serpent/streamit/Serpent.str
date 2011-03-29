@@ -1,0 +1,71 @@
+// Implements Serpent encoder 
+// (see section 2 of ../docs for algorithm details)
+// (rodric rabbah, <rabbah@mit.edu>)
+
+void->void pipeline Serpent
+{
+    int testvector = 2;
+
+    add PlainTextSource(testvector);
+    add SerpentEncoder(testvector);
+    add HexPrinter(CIPHERTEXT, NBITS);
+}
+
+bit->bit pipeline SerpentEncoder(int vector)
+{
+    // perform initial permutation
+    add Permute(NBITS, IP);
+    
+    for (int i = 0; i < MAXROUNDS; i++) {
+        // perform round i
+        add R(vector, i);  
+    }
+
+    // perform final permutation
+    add Permute(NBITS, FP);
+}
+
+
+// substitution boxes
+bit->bit filter Sbox(int round) 
+{
+    work push 4 pop 4 {
+        int val = pop();
+        val = (pop() << 1) | val;
+        val = (pop() << 2) | val;
+        val = (pop() << 3) | val;
+
+        int out = SBOXES[round][val];
+        push((bit)((out & 0x1) >> 0));
+        push((bit)((out & 0x2) >> 1));
+        push((bit)((out & 0x4) >> 2));
+        push((bit)((out & 0x8) >> 3));
+    }
+}
+
+// round functions
+bit->bit pipeline R(int vector, int round)
+{
+    add bit->bit splitjoin {
+        split roundrobin(NBITS, 0);
+        add Identity<bit>;
+        add KeySchedule(vector, round);
+        join roundrobin(1);
+    }
+
+    add Xor(2);
+
+    add Sbox(round % 8);
+
+    if (round < MAXROUNDS - 1) {
+        add rawL();
+    } else {
+        add bit->bit splitjoin {
+            split roundrobin(NBITS, 0);
+            add Identity<bit>;
+            add KeySchedule(vector, MAXROUNDS);
+            join roundrobin(1);
+        }
+        add Xor(2);
+    }
+}

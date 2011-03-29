@@ -1,0 +1,19 @@
+<benchmark>
+  <name>audio-beamformer</name>
+  <desc>Audio beam former</desc>
+  <description>
+  This is a benchmark from the Raw group that does real-time
+  beamforming on a microphone input array.
+  </description>
+  <implementations>
+    <impl lang="C" dir="c">
+      <file>optimized.c</file>
+      <desc>Hand-coded and optimized C version.</desc>
+    </impl>
+    <impl lang="StreamIt" dir="streamit" iters="19987">
+      <desc>StreamIt benchmark as described above.</desc>
+      <file class="source">Audiobeam.str</file>
+      <file class="data" relative="true">../data/str-data/near-field/data2.bin</file>
+    </impl>
+  </implementations>
+</benchmark>

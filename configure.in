@@ -1,0 +1,211 @@
+dnl
+dnl configure.in: StreamIt configuration script
+dnl Process this file with 'autoconf' to produce a configure script.
+dnl $Id: configure.in,v 1.22 2006/09/06 19:29:01 thies Exp $
+dnl
+dnl use without java macros (current):
+dnl autoconf configure.in > configure
+dnl chmod 755 configure
+dnl 
+dnl
+dnl use with java macros::
+dnl cat misc/ac_java_macros.m4 configure.in > configure.in2
+dnl autoconf configure.in2 > configure
+dnl chmod 755 configure
+dnl
+
+AC_INIT([StreamIt], [2.1.1], [streamit@csail.mit.edu])
+
+dnl which release is this?
+AC_MSG_CHECKING([for source release])
+if test -d $srcdir/src; then
+  STREAMIT_SRC=1
+  AC_MSG_RESULT([yes])
+else
+  STREAMIT_SRC=0
+  AC_MSG_RESULT([no])
+fi
+
+dnl checks for programs
+dnl These are essential, without them nothing goes.
+AC_PATH_PROG(PERL, perl)
+if test -z "$PERL"; then
+AC_MSG_ERROR(
+[Can not find perl.  This is needed to run the main strc compiler script;
+please install perl on your system and re-run configure.])
+fi
+
+AC_CHECK_PROGS(JAVA, [java])dnl can add more JVMs here
+if test -z "$JAVA"; then
+AC_MSG_ERROR(
+[Can not find a Java virtual machine.  This is needed to run the
+compiler.  If your JVM is not named 'java', please re-run configure,
+adding JAVA=jvmname to the end of the command line.])
+fi
+
+dnl
+dnl The following will not work since java 1.5 class file format is different
+dnl and the java tests' reaction to having the class file rejected is to
+dnl try to recompile it.  But we do not require a java compiler for binary
+dnl distrib. 
+dnl
+dnl AC_CHECK_CLASS(java.lang.EnumConstantNotPresentException)
+dnl if test x"`eval 'echo $ac_cv_class_java_lang_EnumConstantNotPresentException'`" == xno ; then
+dnl AC_MSG_ERROR(
+dnl [Can not find Java version 1.5 methods in your CLASSPATH. You will need Java version 1.5 to run StreamIt. Your CLASSPATH is currently set to $CLASSPATH.])
+dnl fi
+dnl
+dnl The following works to identify versions of Hotspot only:
+dnl If they hava a java compiler, we could do better
+if $JAVA -version 2>&1 | grep -q 1\\\.5 > /dev/null; then
+dnl OK: have sun java 1.5 -- sun java takes -version and outpts to stderr
+JAVA5=1
+else
+JAVA5=0
+AC_MSG_ERROR(
+[Your Java virtual machine seems not to accept Java version 1.5. \
+Make sure that "$JAVA -version" responds with a message including "1.5".])
+fi
+
+
+AC_CHECK_PROGS(JAVAC, [javac])
+if test -z "$JAVAC"; then
+AC_MSG_WARN(
+[Can not find a Java compiler.  The StreamIt compiler should still
+run fine, but you may not be able to test programs separately under
+the StreamIt Java runtime library.])
+fi
+
+dnl This needs an install-sh:
+dnl AC_PROG_INSTALL
+AC_PROG_LN_S
+
+dnl Back end toolchain:
+AC_PROG_CXX
+if test -z "$CXX"; then
+AC_MSG_WARN(
+[Can not find a C++ compiler.  The StreamIt compiler should still
+run fine compiling to C or C++, but you may not be able to use the 
+output of the uniprocessor and cluster back ends.])
+fi
+AC_PROG_CC
+if test -z "$CC"; then
+AC_MSG_WARN(
+[Can not find a C compiler.  The StreamIt compiler should still
+run fine compiling to C or C++, but you may not be able to use the 
+output of the simpleC back end.])
+fi
+AC_CHECK_TOOL(RANLIB, ranlib)
+AC_CHECK_TOOL(AR, ar)
+AC_CHECK_TOOL(RM, rm)
+AC_CHECK_TOOL(MAKE, make)
+if test -z "$AR" || test -z "$RM" || test -z "$MAKE" || test -z "$RANLIB"; then
+AC_MSG_WARN(
+[Some components of your C compiler's toolchain are missing.
+The StreamIt compiler should still run fine compiling to C or C++, 
+but you may not be able to use the output of the backends.
+Furthermore, you will have to edit Makefile to have it not attempt
+to make library/cluster, which needs these tools.])
+fi
+
+dnl AC_PATH_PROG(PYTHON, python)dnl what uses this?
+
+if test "$STREAMIT_SRC" = 1; then
+dnl makefile bits
+AC_CHECK_TOOL(SED, sed)
+AC_CHECK_TOOL(FIND, find)
+AC_CHECK_TOOL(XARGS, xargs)
+if test -z "$JAVAC" || test -z "$SED" || test -z "$FIND" || \
+  test -z "$XARGS"; then
+AC_MSG_WARN(
+[You are missing some programs needed to compile the src tree.])
+fi
+dnl Documentation bits:
+CAN_DOC=1
+AC_CHECK_PROGS(LATEX, latex)
+AC_CHECK_PROGS(BIBTEX, bibtex)
+AC_CHECK_PROGS(DVIPS, dvips)
+AC_CHECK_PROGS(MPOST, mpost)
+if test -z "$LATEX" || test -z "$BIBTEX" || test -z "$DVIPS" || \
+  test -z "$MPOST"; then
+CAN_DOC=0
+AC_MSG_WARN(
+[You don't seem to have a complete LaTeX installation.
+Rebuilding the documentation from source won't work.])
+else
+AC_CHECK_PROGS(PS2PDF, ps2pdf)
+if test -z "$PS2PDF"; then
+CAN_DOC=0
+AC_MSG_WARN(
+[You don't have a ps2pdf, so you can't produce PDF
+versions of the documentation.  Because of this, rebuilding the
+documentation from source won't work.])
+fi
+AC_CHECK_PROGS(HEVEA, hevea)
+AC_CHECK_PROGS(IMAGEN, imagen)
+if test -z "$HEVEA" || test -z "$IMAGEN"; then
+CAN_DOC=0
+AC_MSG_WARN(
+[You don't seem to have the hevea LaTeX-to-HTML converter,
+so you can't produce HTML or text versions of the documentation.  Because
+of this, rebuilding the documentation from source won't work.])
+fi
+fi
+
+dnl ANTLR:
+AC_MSG_CHECKING([for antlr.Tool])
+
+if test "$STREAMIT_SRC" = 1; then
+case `$JAVA antlr.Tool 2>&1` in
+*java.lang.NoClassDefFoundError:*)
+  AC_MSG_RESULT([no])
+  AC_MSG_ERROR(
+[Couldn't find the antlr.Tool class in your Java CLASSPATH.  If you have
+ANTLR installed somewhere, add the antlr.jar file from the distribution
+to your CLASSPATH and re-run configure.  Otherwise, get ANTLR from
+http://www.antlr.org/.])
+  ;;
+*)
+  AC_MSG_RESULT([yes])
+  ;;
+esac
+fi
+fi
+
+dnl checks for libraries
+HAVE_FFTW=1
+AC_SUBST([HAVE_FFTW])
+AC_CHECK_LIB(sfftw, fftw_create_plan, :, [HAVE_FFTW=0], [-lm])
+AC_CHECK_LIB(srfftw, rfftw_create_plan, :, [HAVE_FFTW=0], [-lm -lsfftw])
+
+dnl checks for header files
+AC_CHECK_HEADER(sfftw.h, :, [HAVE_FFTW=0])
+AC_CHECK_HEADER(srfftw.h, :, [HAVE_FFTW=0])
+
+if test "$HAVE_FFTW" = 0; then
+AC_MSG_WARN(
+[You don't seem to have the fftw library installed, or maybe
+it's not built properly for single-precision floats.  The uniprocessor
+C library will be built to not use fftw for Fourier transforms, but this
+means that the --frequencyreplacement and --linearpartition options
+will fail.])
+fi
+
+dnl checks for types
+dnl checks for structures
+dnl checks for compiler characteristics
+dnl checks for library functions
+dnl checks for system services
+
+dnl disable building things that only work in inhouse (inlab?) setting
+CAG_BUILD=0
+AC_SUBST([CAG_BUILD])
+
+AC_CONFIG_FILES([Makefile misc/Makefile.vars])
+AC_CONFIG_FILES([strc], [chmod +x strc])
+AC_CONFIG_FILES([misc/dat2bin.pl misc/htmlformat.pl])
+AC_CONFIG_FILES([misc/concat_cluster_threads_cpp.pl], [chmod +x misc/concat_cluster_threads_cpp.pl])
+AC_CONFIG_FILES([misc/scripts/streamitdoc misc/scripts/turnOffPrints.pl])
+AC_CONFIG_FILES([misc/scripts/preprocess.perl], [chmod +x misc/scripts/preprocess.perl])
+AC_OUTPUT
+

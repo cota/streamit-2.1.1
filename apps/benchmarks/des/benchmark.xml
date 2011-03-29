@@ -1,0 +1,14 @@
+<benchmark>
+  <name>des</name>
+  <desc>DES encryption algoritm</desc>
+  <description>
+  This benchmark implements the DES encryption algorithm.
+  </description>
+  <implementations>
+    <impl lang="StreamIt" dir="streamit" iters="1">
+      <desc>StreamIt benchmark as described above.</desc>
+      <file class="source">DES.str Sboxes.str Utils.str Keys.str Source.str Statics.str</file>
+      <file class="output">../output/output.txt</file>
+    </impl>
+  </implementations>
+</benchmark>

@@ -1,0 +1,28 @@
+\@addtocsec{htoc}{1}{0}{\@print{1}\quad{}StreamIt Overview}
+\newlabel{fig:fmradio}{{1}{X}}
+\@addtocsec{htoc}{2}{0}{\@print{2}\quad{}Programming in StreamIt}
+\@addtocsec{htoc}{3}{1}{\@print{2.1}\quad{}A Minimal Program}
+\@addtocsec{htoc}{4}{1}{\@print{2.2}\quad{}A Moving Average Filter}
+\@addtocsec{htoc}{5}{1}{\@print{2.3}\quad{}A Low-Pass Filter}
+\@addtocsec{htoc}{6}{1}{\@print{2.4}\quad{}A Band-Pass Filter}
+\@addtocsec{htoc}{7}{1}{\@print{2.5}\quad{}An Equalizer}
+\newlabel{fig:equalizer}{{2}{X}}
+\@addtocsec{htoc}{8}{1}{\@print{2.6}\quad{}An Echo}
+\@addtocsec{htoc}{9}{1}{\@print{2.7}\quad{}Fibonacci}
+\@addtocsec{htoc}{10}{0}{\@print{3}\quad{}Using the StreamIt Compiler}
+\newlabel{sec:compiler}{{3}{X}}
+\@addtocsec{htoc}{11}{1}{\@print{3.1}\quad{}Compiling for a Uniprocessor}
+\newlabel{fig:fm-sir-tree}{{3}{X}}
+\newlabel{fig:dot-uni}{{4}{X}}
+\newlabel{fig:fm-linear-simple}{{5}{X}}
+\newlabel{fig:fm-after-linear}{{6}{X}}
+\newlabel{fig:dot-linear}{{7}{X}}
+\@addtocsec{htoc}{12}{1}{\@print{3.2}\quad{}Compiling for a Cluster or Multicore}
+\@addtocsec{htoc}{13}{2}{\@print{3.2.1}\quad{}Multicores}
+\newlabel{fig:dot-cluster}{{8}{X}}
+\newlabel{fig:after-partition}{{9}{X}}
+\@addtocsec{htoc}{14}{2}{\@print{3.2.2}\quad{}Cluster of Workstations}
+\@addtocsec{htoc}{15}{1}{\@print{3.3}\quad{}Using the Java Library}
+\@addtocsec{htoc}{16}{0}{\@print{A}\quad{}Keyword Review}
+\@addtocsec{htoc}{17}{0}{\@print{B}\quad{}Options}
+\newlabel{ap:options}{{B}{X}}

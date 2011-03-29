@@ -1,0 +1,63 @@
+%
+% streamit.sty: declare a `streamit' language for listings
+% David Maze <dmaze@cag.lcs.mit.edu>
+% $Id: streamit.sty,v 1.3 2003/05/13 19:50:35 dmaze Exp $
+%
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{streamit}[2003/03/03 v2.0 StreamIt Syntax Highlighting]
+
+% What should basicstyle be set to here?  Its default value doesn't
+% cause inline code segments to be highlighted at all.  \sffamily
+% gets around this, but computer modern sans serif bold is too heavy
+% compared to the rest of the text (this seems odd to me).  \ttfamily
+% doesn't have bold.  We might experiment with PS fonts, or with using
+% \sffamily but also setting keywordstyle to empty.
+%
+% ...experimenting with postscript fonts: \usepackage{palatino} or
+% \usepackage{times} gets us Helvetica for \sffamily, which is fine,
+% but it looks bad and is just too big besides.  \ttfamily then is
+% Courier, though, which has bold and arguably looks better than
+% anything else we've looked at.  Courier bold is noticably heavier
+% than not-bold, though.
+%
+% Combinations that seem to work reasonably:
+% -- CM, basicstyle=\sffamily,keywordstyle={}
+% -- CM, basicstyle=\ttfamily (no boldness)
+% -- PS, basicstyle=\ttfamily
+%
+% The literate option also looks better if we're using
+% \sffamily, but isn't strictly speaking correct.
+%
+% Hence, some options:
+\newif\if@usett\@usetttrue
+\DeclareOption{tt}{\@usetttrue}
+\DeclareOption{sf}{\@usettfalse}
+\newif\if@usebf\@usebffalse
+\DeclareOption{bf}{\@usebftrue}
+\DeclareOption{nobf}{\@usebffalse}
+%
+% Defaults are monospace font, no boldness (the second case).
+% \usepackage[sf]{streamit} for the first case;
+% \usepackage[tt,bf]{streamit} for the third.
+\ProcessOptions
+
+% Cause the `listings' package to exist, and define a `streamit'
+% language for it.  This needs to happen after we read our own
+% options.
+\RequirePackage{listings}
+
+\lstdefinelanguage{StreamIt}%
+{morekeywords={filter,pipeline,splitjoin,feedbackloop,%
+boolean,bit,int,float,complex,void,struct,true,false,%
+init,prework,work,phase,push,pop,peek,enqueue,add,loop,body,%
+split,join,duplicate,roundrobin,template,string,continue,%
+break,do,for,while,if,else},%
+morecomment=[l]{//},morecomment=[s]{/*}{*/},%
+%literate={->}{$\rightarrow$}1%
+}
+\lstset{language=StreamIt,flexiblecolumns=true,%
+  basicstyle=\if@usett\ttfamily\else\sffamily\fi,%
+  keywordstyle=\if@usebf\bfseries\else{}\fi,%
+  commentstyle=\slshape}
+

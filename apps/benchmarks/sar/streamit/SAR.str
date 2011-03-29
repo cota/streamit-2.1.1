@@ -1,0 +1,435 @@
+// Code adapted FROM formSARimage.m
+// (rodric rabbah, <rabbah@mit.edu>)
+//
+// % Function formSARimage() - part of Kernel 1 - Given the raw SAR complex 
+// % data, forms the SAR image.
+// %
+// % Modified companion code to Mehrdad Soumekh's text book "Synthetic Aperture 
+// % Radar Signal Processing with Matlab Algorithms", Wiley, New York, NY, 1999.
+// %
+// % This function digitally reconstructs the SAR image using spatial frequency 
+// % interpolation (see noted text, Section 4.5).
+
+void->void pipeline SAR()
+{
+    // genRawSAR.m
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %% u domain parameters and arrays for compressed SAR signal %%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    float duc = ((Xc * lambda_min) / (4 * Y0)) / 1.2;
+
+    /* number of samples on aperture */
+    int   mc  = 2 * (int) ceil(L / duc);
+
+    float dku = PI2 / ((float) mc * duc);
+          
+    /* synthetic aperture array */
+    float[mc] uc;           
+    float[mc] kuc;
+
+    for (int i = 0; i < mc; i++) {
+        uc[i]  = duc * (((float) i) - ((float) mc) / 2.0);
+        kuc[i] = dku * (((float) i) - ((float) mc) / 2.0);
+    }
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%    u domain parameters and arrays for SAR signal     %%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    float theta_min = atan((0 - Y0 - L) / (Xc - X0));
+    float theta_max = atan((Y0 + L) / (Xc - X0)); 
+    
+    float du = lambda_min / (1.4 * 2 * (sin(theta_max) - sin(theta_min)));
+
+    /* number of samples on aperture */
+    int   m  = 2 * (int) ceil(PI / (du * dku));
+          du = PI2 / (m * dku);                   
+    
+    /* synthetic aperture array */
+    float[m] u;
+    float[m] ku;           
+
+    for (int i = 0; i < m; i++) {
+        u[i]  = du  * (((float) i) - ((float) m) / 2.0);
+        ku[i] = dku * (((float) i) - ((float) m) / 2.0);
+    }
+    
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    // %%       Fast-time domain parmeters and arrays          %%
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    float Ts   = (2 / c) * Rmin; 
+    float Tf   = (2 / c) * Rmax + Tp;
+    float T    = Tf - Ts;
+    Ts         = Ts - 0.1 * T;  
+    Tf         = Tf + 0.1 * T;  
+    T          = Tf - Ts;
+    float Tmin = max(T, (4 * X0) / (c * cos(theta_max))); 
+    float dt   = 1 / (4 * f0);
+
+    /* number of time samples */
+    int   n    = 2 * (int) ceil((0.5 * Tmin) / dt);     
+    
+    /* Wavenumber array */
+    float[n] t;
+    float[n] k;
+    
+    for (int i = 0; i < n; i++) {
+        t[i] = Ts + i * dt;
+        k[i] = (PI2 / c) * (fc + 4 * f0 * (((float) i) - ((float) n) / 2.0) / n);
+    }
+    
+    // Generate Raw Image
+    add void->int filter { // NOTE: mock filter to ger around compiler limitation w.r.t. null splitters
+        work push 1 { push(1); }
+    }
+
+    add int->complex splitjoin {
+        split duplicate;
+        add FastTimeFilter(n, t);
+        add pipeline {
+            add genRawSAR(Tf, n, m, mc, t, k, ku, uc);
+            add FTX2D(n, mc);
+        }
+        join roundrobin(1, mc);
+    }
+        
+    add complex->complex filter {
+        work pop n+n*mc push n*mc {
+            for (int i = 0; i < n; i++) {
+                complex ftf = pop();
+                for (int j = 0; j < mc; j++) {
+                    complex s   = pop();
+                    complex out;
+                    
+                    out.real = s.real * ftf.real - s.imag * ftf.imag;
+                    out.imag = s.imag * ftf.real + s.real * ftf.imag;
+                    
+                    push(out);
+                }
+            }
+        }
+    }
+
+    // Digital Spotlighting and Bandwidth Expansion in ku Domain  
+    // via Slow-time Compression and Decompression
+
+    //// Compression
+    add Compression(n, mc, k, uc);    
+
+    //// Narrow-bandwidth Polar Format Processed reconstruction
+    add FTY2D(n, mc);   
+
+    //// Zero-padding in ku domain for slow-time upsampling
+    add ZeroPadding(n, m, mc);
+    
+    //// Transform to (omega,u) domain
+    add iFTY2D(n, m);
+
+    //// Decompression
+    add Decompression(n, m, k, u);
+
+    //// Digitally-spotlighted SAR signal spectrum
+    add FTY2D(n, m);
+
+    // SAR RECONSTRUCTION (multiple stages)
+    // - 2D Fourier Matched Filtering and Interpolation
+    // - Inverse 2D FFT for spatial domain image
+    add Reconstruction(n, m, k, ku);
+
+    // NOTE: to compate to MATLAB output, transpose again
+    // add floatTranspose(266, m);
+    add FloatPrinter();
+}
+
+// print results
+float->void filter FloatPrinter() {
+    work pop 1 { 
+        println(pop());
+    }
+}
+
+// Zero-padding
+complex->complex filter ZeroPadding(int n, 
+                                    int m, 
+                                    int mc)
+{
+    int     mz = m - mc;
+    float   q  = (float) m / (float) mc;
+    complex zero;
+
+    init {
+        zero = 0 + 0i;
+    }
+    
+    work push n*m pop n*mc {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                if ((j < mz / 2) || ( j >= mc+mz / 2)) {
+                    push(zero);
+                } else {
+                    complex in = pop();
+                    complex out;
+                    out.real = q * in.real;
+                    out.imag = q * in.imag;
+                    push(out);
+                }
+            }
+        }
+    }
+}
+
+// Compression
+complex->complex filter Compression(int n, 
+                                    int mc, 
+                                    float[n] k, 
+                                    float[mc] uc)
+{
+    float[n][mc] cos_value;
+    float[n][mc] sin_value;
+    
+    init {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < mc; j++){
+                float value = 2 * (k[i] * (sqrt(pow(Xc, 2) + pow(uc[j], 2)) - Xc));
+                
+                cos_value[i][j] = cos(value);
+                sin_value[i][j] = sin(value);
+            }
+        }
+    }
+    
+    work push n*mc pop n*mc {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < mc; j++){
+                complex in = pop();
+                complex out;
+                
+                out.real = 
+                    (in.real * cos_value[i][j]) - 
+                    (in.imag * sin_value[i][j]);
+                
+                out.imag =
+                    (in.imag * cos_value[i][j]) + 
+                    (in.real * sin_value[i][j]);
+                
+                push(out);
+            }
+        }
+    }
+}
+
+// Decompression
+complex->complex filter Decompression(int n, 
+                                      int m, 
+                                      float[n] k, 
+                                      float[m] u)
+{
+    float[n][m] cos_value;
+    float[n][m] sin_value;
+    
+    init {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++){
+                float value = 2 * (k[i] * (sqrt(pow(Xc, 2) + pow(u[j], 2)) - Xc));
+                
+                cos_value[i][j] = cos(value);
+                sin_value[i][j] = sin(value);
+            }
+        }
+    }
+    
+    work push n*m pop n*m {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++){
+                complex in = pop();
+                complex out;
+                
+                out.real = 
+                    (in.real * cos_value[i][j]) +
+                    (in.imag * sin_value[i][j]);
+                
+                out.imag =
+                    (in.imag * cos_value[i][j]) - 
+                    (in.real * sin_value[i][j]);
+                
+                push(out);
+            }
+        }
+    }
+}
+
+// Reconstruction (multiple stages)
+complex->float pipeline Reconstruction(int n,
+                                       int m,
+                                       float[n] k, 
+                                       float[m] ku)
+{
+    add matchedFiltering(n, m, k, ku);
+
+    int nx  = 266;
+    add convolutionInterpolation(n, nx, m, k, ku);
+
+    /// Inverse 2D FFT for spatial domain image f(x,y) [p203 fig4.6]
+    add iFTY2D(nx, m);
+    add iFTX2D(nx, m);
+    
+    add complexAbsoluate();
+    add floatTranspose(nx, m);
+}
+
+// matchedFilterting (stage 1 of Reconstruction)
+complex->complex filter matchedFiltering(int n,
+                                         int m, 
+                                         float[n] k, 
+                                         float[m] ku)
+{
+    // NOTE: <kx> is redefined because of a lack of proper support
+    // for global arrays; the array itself is too big to be fully 
+    // unrolled since it leads to 1.4M lines of code and chokes gcc    
+    float[n][m]   kx;
+    complex[n][m] fs0;
+
+    init {
+        for (int i = 0; i < n; i++) {
+            for(int j = 0; j < m; j++) {
+                float val = (4 * (k[i] * k[i])) - (ku[j] * ku[j]);
+                
+                if (val > 0) {
+                    kx[i][j] = sqrt(val);
+                } 
+                else { 
+                    kx[i][j] = 0; 
+                }
+            }
+        }
+
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                if (kx[i][j] > 0) {
+                    float value = kx[i][j] * Xc + ku[j] + 0.25 * PI - 2 * k[i] * Xc;
+                    fs0[i][j].real = cos(value);
+                    fs0[i][j].imag = sin(value);
+                }
+            }
+        }
+    }
+    
+    work pop n*m push n*m {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                complex fs = pop();
+                complex out;
+                
+                out.real = fs.real * fs0[i][j].real - fs.imag * fs0[i][j].imag;
+                out.imag = fs.real * fs0[i][j].imag + fs.imag * fs0[i][j].real;
+                push(out);
+            }
+        }
+    }
+}
+
+// convolutionInterpolation (stage 2 of Reconstruction)
+complex->complex filter convolutionInterpolation(int n,
+                                                 int nx, 
+                                                 int m, 
+                                                 float[n] k, 
+                                                 float[m] ku)
+{
+    // NOTE: <kx> is redefined because of a lack of proper support
+    // for global arrays; the array itself is too big to be fully 
+    // unrolled since it leads to 1.4M lines of code and chokes gcc
+    float[n][m] kx;
+    float kxmin = 1e25;
+    float kxmax = 0;
+
+    float dkx = PI / X0;
+    int   is  = 8;
+    int   I   = 2 * is + 1;
+
+    float kxs = (float) is * dkx;
+    float[nx] KX;
+
+    int[m]      icKX;
+    int[I][m]   ikx;
+    float[I][m] nKX;
+    float[I][m] SINC;
+    float[I][m] HAM;
+
+    complex[nx][m] F;
+
+    init {
+        for (int i = 0; i < n; i++) {
+            for(int j = 0; j < m; j++) {
+                float val = (4 * (k[i] * k[i])) - (ku[j] * ku[j]);
+                
+                if (val > 0) {
+                    kx[i][j] = sqrt(val);
+                } 
+                else { 
+                    kx[i][j] = 0; 
+                }
+
+                if (kxmax < kx[i][j]) {
+                    kxmax = kx[i][j];
+                }
+                if (kxmin > kx[i][j]) {
+                    kxmin = kx[i][j];
+                }
+            }
+        }
+
+        for (int i = 0; i < nx; i++) {
+            KX[i] = kxmin + ((0 - is) - 2 + i) * dkx;
+        }
+    }
+    
+    work push nx*m pop n*m {
+        for (int i = 0; i < n; i++) {
+            for (int l = 0; l < I; l++) {
+                for (int j = 0; j < m; j++) {
+                    icKX[j] = (int) round((kx[i][j] - KX[0]) / dkx) + 1;
+                    
+                    ikx[l][j] = icKX[j] + (l - is);
+                    ikx[l][j] = ikx[l][j] + (nx * j);
+                    
+                    nKX[l][j] = KX[(ikx[l][j] - 1) % nx];
+                    
+                    float x = (nKX[l][j] - kx[i][j]) / dkx;
+                    if (x == 0) {
+                        SINC[l][j] = 1;
+                    }
+                    else {
+                        SINC[l][j] = sin(PI * x) / (PI * x);
+                    }
+                    
+                    HAM[l][j] = 0.54 + (0.46 * cos((PI / kxs) * (nKX[l][j] - kx[i][j])));
+                }
+            }
+   
+            for (int j = 0; j < I; j++) {
+                for(int l = 0; l < m; l++) {
+                    complex t = peek((i*m) + l);
+                    
+                    int ri = (ikx[j][l] - 1) % nx;
+                    int ci = (ikx[j][l] - 1) / nx;
+                    
+                    F[ri][ci].real += t.real * SINC[j][l] * HAM[j][l];
+                    F[ri][ci].imag += t.imag * SINC[j][l] * HAM[j][l];
+                }
+            }
+        }
+
+        for (int j = 0; j < nx; j++) {
+            for(int l = 0; l < m; l++) {
+                push(F[j][l]);
+            }
+        }
+        for (int j = 0; j < n; j++) {
+            for(int l = 0; l < m; l++) {
+                pop();
+            }
+        }
+    }
+}

@@ -1,0 +1,168 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+            "http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD><TITLE>Options to the StreamIt 'strc' Compiler Script</TITLE>
+
+<META http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<META name="GENERATOR" content="hevea 1.06">
+</HEAD>
+<BODY >
+<!--HEVEA command line is: hevea -nosymb options.tex -->
+<!--HTMLHEAD-->
+<!--ENDHTML-->
+<!--PREFIX <ARG ></ARG>-->
+<!--CUT DEF section 1 -->
+
+
+<H1 ALIGN=center>Options to the StreamIt 'strc' Compiler Script</H1>
+
+
+This is for the January 29, 2007 release of the StreamIt compiler and
+runtime system, version 2.1.1.<BR>
+<CODE>$Id: options.tex.in,v 1.12 2006/08/29 23:40:42 thies Exp $</CODE><BR>
+<BR>
+<!--TOC section Basic Usage-->
+
+<H2>Basic Usage</H2><!--SEC END -->
+
+<PRE>
+strc Foo.str
+</PRE>
+Reads <FONT COLOR=purple>Foo.str</FONT>, produces <FONT COLOR=purple>Foo.java</FONT> as an
+intermediate file, compiles this down to a number of C++ files, and
+then compiles and links this to produce a binary, <FONT COLOR=purple>a.out</FONT>.<BR>
+<BR>
+<!--TOC section Options-->
+
+<H2>Options</H2><!--SEC END -->
+
+
+
+<DL COMPACT=compact><DT>
+<B>--help</B><DD>
+Displays a summary of common options.<BR>
+<BR>
+<DT><B>--more-help</B><DD> 
+Displays a summary of advanced options (which are not described below).<BR>
+<BR>
+<DT><B>--cluster &lt;<EM>n</EM>&gt;</B><DD>
+Compile for a cluter or multicore with &lt;<EM>n</EM>&gt; nodes.<BR>
+<BR>
+<DT><B>--library</B><DD>
+Produce a Java file compatible with the StreamIt Java library,
+and compile and run it.<BR>
+<BR>
+<DT><B>--simpleC</B><DD>
+Generate a simple C file that inlines the entire application into a
+single function. This is sometimes more readable than the default
+uniprocessor output, but the backend is not fully-featured.<BR>
+<BR>
+<DT><B>--raw &lt;<EM>n</EM>&gt;, -r &lt;<EM>n</EM>&gt;</B><DD>
+Compile for an &lt;<EM>n</EM>&gt;-by-&lt;<EM>n</EM>&gt; Raw processor.<BR>
+<BR>
+<DT><B>--rstream, -R</B><DD>
+Generate a C-like file to be compiled by the RStream compiler from
+Reservoir Labs.<BR>
+<BR>
+<DT><B>--output &lt;<EM>filename</EM>&gt;, -o &lt;<EM>filename</EM>&gt;</B><DD>
+Places the resulting binary in &lt;<EM>filename</EM>&gt;.<BR>
+<BR>
+<DT><B>--verbose</B><DD>
+Show intermediate commands as they are executed.
+</DL>
+<!--TOC subsection Options available for all backends-->
+
+<H3>Options available for all backends</H3><!--SEC END -->
+
+<DL COMPACT=compact><DT>
+<B>-O0</B><DD>
+Do not optimize (default).<BR>
+<BR>
+<DT><B>-O1</B><DD>
+Perform basic optimizations that should improve performance in most
+cases. Adds <TT>--unroll 16 --destroyfieldarray --partition --wbs</TT>.<BR>
+<BR>
+<DT><B>-O2</B><DD>
+Perform extended optimizations that should improve performance in
+most cases, but may also cause the compiler to become unstable.
+Adds <TT>--unroll 256 --destroyfieldarray --partition --wbs --macros</TT>.<BR>
+<BR>
+<DT><B>--iterations &lt;<EM>n</EM>&gt;, -i&lt;<EM>n</EM>&gt;</B><DD>
+Run the program for &lt;<EM>n</EM>&gt; steady-state iterations. Defaults to
+infinity. For the uniprocessor, cluster, and simpleC backends, the
+number of iterations can also be passed at the command line of the
+final executable (<TT>a.out -i 100</TT>).<BR>
+<BR>
+<DT><B>--linearreplacement</B><DD>
+Domain-specific optimization: combine adjacent ``linear'' filters in
+the program into a single matrix multiplication operation wherever
+possible. Corresponds to the ``linear'' option in the PLDI'03 paper.<BR>
+<BR>
+<DT><B>--statespace</B><DD>
+In combination with <TT>--linearreplacement</TT>, performs combination
+and optimization of linear statespace filters as described in the
+CASES'05 paper.<BR>
+<BR>
+<DT><B>--unroll &lt;<EM>n</EM>&gt;, -u&lt;<EM>n</EM>&gt;</B><DD>
+Specify loop unrolling limit. The default value is 0.
+</DL>
+<!--TOC subsection Options specific to Uniprocessor and Cluster backends-->
+
+<H3>Options specific to Uniprocessor and Cluster backends</H3><!--SEC END -->
+
+<DL COMPACT=compact><DT><B>--cacheopt</B><DD>
+Performs cache optimizations as described in the LCTES'05 paper.<BR>
+<BR>
+<DT><B>--l1d &lt;<EM>n</EM>&gt;</B><DD>
+Sets the L1 data cache size (in KB) for cache optimizations. The
+default is 8 KB.<BR>
+<BR>
+<DT><B>--l1i &lt;<EM>n</EM>&gt;</B><DD>
+Sets the L1 instruction cache size (in KB) for cache optimizations.
+The default is 8 KB.<BR>
+<BR>
+<DT><B>--l2 &lt;<EM>n</EM>&gt;</B><DD>
+Sets the L2 cache size (in KB) for cache optimizations (we assume a
+unified L2 cache). The default is 256 KB.<BR>
+<BR>
+<DT><B>--linearpartition, -L</B><DD>
+Domain-specific optimization: perform linear replacement and frequency
+replacement selectively, based on an estimate of where it is most
+beneficial. Corresponds to the ``autosel'' option in the PLDI'03
+paper. (Relies on FFTW installation.)</DL>
+<!--TOC subsection Options specific to Raw backend-->
+
+<H3>Options specific to Raw backend</H3><!--SEC END -->
+
+<DL COMPACT=compact><DT>
+<B>--asciifileio</B><DD>
+Specifies that FileReader's and FileWriter's should use ASCII format
+rather than binary. Also works under the <TT>--simpleC</TT> backend.<BR>
+<BR>
+<DT><B>--numbers &lt;<EM>n</EM>&gt;, -N&lt;<EM>n</EM>&gt;</B><DD>
+Instrument code to gather performance statistics on simulated code
+over &lt;<EM>n</EM>&gt; steady-state cycles. The results are placed in
+<FONT COLOR=purple>results.out</FONT> in the current directory.<BR>
+<BR>
+<DT><B>--ssoutputs &lt;<EM>n</EM>&gt;</B><DD>
+For applications containing a dynamic I/O rate, this option indicates
+how many outputs should count as a steady-state when gathering numbers
+(with <TT>--numbers</TT>).<BR>
+<BR>
+<DT><B>--rawcol &lt;<EM>m</EM>&gt;, -c&lt;<EM>m</EM>&gt;</B><DD>
+Specify number of columns in Raw processor; --raw specifies number of rows.<BR>
+<BR>
+<DT><B>--wbs</B><DD> When laying out communication instructions, use the 
+work-based simulator to estimate exactly when items will be produced
+and consumed. This improves the scheduling of routing instructions.</DL>
+
+
+<!--HTMLFOOT-->
+<!--ENDHTML-->
+<!--FOOTER-->
+<HR SIZE=2>
+<BLOCKQUOTE><EM>This document was translated from L<sup>A</sup>T<sub>E</sub>X by
+</EM><A HREF="http://pauillac.inria.fr/~maranget/hevea/index.html"><EM>H<FONT SIZE=2><sup>E</sup></FONT>V<FONT SIZE=2><sup>E</sup></FONT>A</EM></A><EM>.
+</EM></BLOCKQUOTE>
+</BODY>
+</HTML>

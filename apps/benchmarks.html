@@ -1,0 +1,1153 @@
+<html xmlns:str="http://exslt.org/strings" xmlns:string="java.lang.String" xmlns:file="java.io.File">
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>StreamIt Benchmarks</title>
+<style fprolloverstyle="0">A:hover {color: #990000}</style>
+</head>
+<body>
+<table align="center" cellpadding="2" width="700" border="0">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<tbody>
+<tr height="150">
+<h3>StreamIt Benchmarks</h3>
+</tr>
+</tbody>
+</table>
+
+
+<h2></h2>
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">audio-beamformer - Audio beam former</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  This is a benchmark from the Raw group that does real-time
+  beamforming on a microphone input array.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>C</b></td><td align="left" valign="top"><a href="././benchmarks/audiobeam/c/optimized.c">optimized.c</a> (Hand-coded and optimized C version.)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/audiobeam/streamit/Audiobeam.str">Audiobeam.str</a> <a href="././benchmarks/audiobeam/streamit/../data/str-data/near-field/data2.bin">data2.bin</a> (StreamIt benchmark as described above.)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">beamformer - Multi-channel beam former</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Template application to perform beam-forming on a set of inputs.  The
+input file should be preprocessed with 'cpp'; running 'make' will
+produce all of the possible outputs.  The application has two stages.
+The top stage gathers input from a set of parallel channels, with FIR
+filters to delay each channel by a different amount.  The bottom stage
+steers the channels into a set of beams, with a detector to sense if
+the signal in a particular location exceeds a given threshold.  The
+"serialized" versions of the beamformer guarantee a deterministic
+output order; otherwise there are outputs in parallel, with ordering
+that depends on the schedule that is chosen.  The "coarse" versions of
+the beamformer perform the same computation, but are written at a
+coarser level of granularity so that some filters do not need to
+retain internal state.  This facilitates some compiler analyses, but
+causes the I/O rates of the filters to be much larger.
+  </td>
+</tr>
+    
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/beamformer/streamit/BeamFormer.str">BeamFormer.str</a> (StreamIt benchmark as described above, with parallel outputs.)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/beamformer/streamit/SerializedBeamFormer.str">SerializedBeamFormer.str</a> (StreamIt benchmark as described above, with deterministic output ordering.)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">bitonic-sort - Bitonic sorting network</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  High performance sorting network (by definition of sorting network, comparison
+  sequence not data-dependent).  Sorts in O(n*log(n)^2) comparisons.  Implementation
+  works only for power-of-2 sizes starting from 2.  
+  </td>
+</tr>
+<tr>
+<td align="left" valign="top"><b>Reference</b></td><td>http://www.iti.fh-flensburg.de/lang/algorithmen/sortieren/bitonic/bitonicen.htm</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>C</b></td><td align="left" valign="top"><a href="././benchmarks/bitonic-sort/c/bitonic.c">bitonic.c</a> ((Hand-coded C version.))<br>
+</td>
+</tr>
+
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/bitonic-sort/streamit/BitonicSort.str">BitonicSort.str</a> (StreamIt benchmark as described above.)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/bitonic-sort/streamit/BitonicSortRecursive.str">BitonicSortRecursive.str</a> (Recursive implementation.)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">DCT - IEEE-complaint DCT and IDCT.</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+The dct_ieee package contains functions that implement Discrete Cosine
+Transforms and Inverse Discrete Cosine Transforms in accordance with
+IEEE specifications for such operations. The IEEE specified DCT is
+used in both the MPEG and JPEG standards. A definition of what makes a
+DCT or inverse DCT implementation conform to the IEEE specification
+can be found in Appendix A of the MPEG-2 specification (ISO/IEC
+13818-2) on P. 125.
+
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/dct_ieee/streamit/DCT.str">DCT.str</a> (Contains a library of DCT and iDCT implementations.  There are
+      two versions of iDCT: a reference version (based on the C
+      reference code for MPEG) and a fast version (an integer iDCT
+      that uses bit-twiddling, but does not have the floating point
+      precision of the reference codes).  There are also fine-grained
+      versions of each implementation, which decompose the problem
+      into sub-problems using splitjoins.)<br>
+</td>
+</tr>
+    
+    
+    
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">des - DES encryption algoritm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  This benchmark implements the DES encryption algorithm.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/des/streamit/DES.str">DES.str</a> <a href="././benchmarks/des/streamit/Sboxes.str">Sboxes.str</a> <a href="././benchmarks/des/streamit/Utils.str">Utils.str</a> <a href="././benchmarks/des/streamit/Keys.str">Keys.str</a> <a href="././benchmarks/des/streamit/Source.str">Source.str</a> <a href="././benchmarks/des/streamit/Statics.str">Statics.str</a> <a href="././benchmarks/des/streamit/../output/output.txt">output.txt</a> (StreamIt benchmark as described above.)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">fft - Fast Fourier Transform kernel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  We have a number of different implementations of the Fast Fourier
+  Transform.  Each is written at a different level of granularity.
+  The coarse-grained implementations are better for obtaining high
+  performance, while the fine-grained implementations are intended to
+  demonstrate the expressiveness of the language.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>C</b></td><td align="left" valign="top"><a href="././benchmarks/fft/c/fft2/driver.c">driver.c</a> <a href="././benchmarks/fft/c/fft2/fft.c">fft.c</a> (Reference implementation for FFT2.)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>C</b></td><td align="left" valign="top"><a href="././benchmarks/fft/c/fft3/driver.c">driver.c</a> <a href="././benchmarks/fft/c/fft3/fft.c">fft.c</a> (Reference implementation for FFT3.)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/fft/streamit/FFT2.str">FFT2.str</a> (Blocked, coarse-grained version for use as a benchmark.  Conceptually it is a single pipeline, but the main path is duplicated into a splitjoin to expose parallelism.  Inputs in natural order, outputs in natural order.  This is the version that we typically use for benchmarking.)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/fft/streamit/FFT3.str">FFT3.str</a> (More fine-grained than FFT2.  Inputs in natural order, outputs in bit-reversed order (does NOT include bit-reversal stage).)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/fft/streamit/FFT4.str">FFT4.str</a> (More fine-grained than FFT3.  Derived from original example in CC'02 paper, and intended only to demonstrate language features (has dummy weights; does not compute real FFT).  Inputs in bit-reversed order, outputs in natural order (does NOT include bit-reversal stage).)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/fft/streamit/FFT5.str">FFT5.str</a> (Fine-grained version, more elegant than FFT4.  Inputs in natural order, outputs in natural order.)<br>
+</td>
+</tr>
+    
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">filterbank - Filter bank for multirate signal processing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Creates a filter bank to perform multirate signal processing.  The
+coefficients for the sets of filters are created in the top-level init
+function, and passed down through the init functions to FIR filter
+objects.  On each branch, a delay, filter, and downsample is
+performed, followed by an upsample, delay, and filter.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>C</b></td><td align="left" valign="top"><a href="././benchmarks/filterbank/c/filterbank.c">filterbank.c</a> </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/filterbank/streamit/FilterBankNew.str">FilterBankNew.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">fm - Software FM radio with equalizer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+FM radio with multi-band equalizer.  The input passes through a demodulator
+to produce an audio signal, and then an equalizer.  The equalizer is
+implemented as a splitjoin with a number of band-pass filters; each band-pass
+filter is in turn the difference of a pair of low-pass filters.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>C</b></td><td align="left" valign="top"><a href="././benchmarks/fm/c/fmref.c">fmref.c</a> </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/fm/streamit/FMRadio.str">FMRadio.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">matmul-block - Blocked matrix multiply</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Generates series of matrices, and multiplies them.  In order to reduce
+the amount of communication, the matrices are divided into equal-sized
+submatrices, which are reordered, pairwise multiplied, and reordered
+again to get the final result matrix.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>C</b></td><td align="left" valign="top"><a href="././benchmarks/matmul-block/c/matmul-block.c">matmul-block.c</a> </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/matmul-block/streamit/MatrixMultBlock.str">MatrixMultBlock.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">mp3decoder - Partial MP3 decoder</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Partial decoder for MPEG 1/2 Layer 3 audio.  This performs the core
+computation necessary for audio decoding, including applying an
+antialiasing filter, an inverse DCT, and PCM synthesis.  This is not
+enough to decode an MP3 audio file, however; the dynamic-rate
+decompression stage has not yet been implemented (though the 
+StreamIt compiler does support dynamic rates).
+  </td>
+</tr>
+
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/mp3decoder/MP3.str">MP3.str</a> <a href="././benchmarks/mp3decoder/Blur.float.raw.portion">Blur.float.raw.portion</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">sar - Synthetic Aperture Radar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Modified companion code to Mehrdad Soumekh's text book "Synthetic Aperture
+Radar Signal Processing with Matlab Algorithms", Wiley, New York, NY, 1999.
+
+This function digitally reconstructs the SAR image using spatial frequency
+interpolation (see noted text, Section 4.5).
+  </td>
+</tr>
+    
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/sar/streamit/SAR.str">SAR.str</a> <a href="././benchmarks/sar/streamit/genRawSAR.str">genRawSAR.str</a> <a href="././benchmarks/sar/streamit/FFT.str">FFT.str</a> <a href="././benchmarks/sar/streamit/Statics.str">Statics.str</a> <a href="././benchmarks/sar/streamit/Utils.str">Utils.str</a> <a href="././benchmarks/sar/streamit/../output/image.txt">image.txt</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">serpent - Serpent encryption algoritm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  This benchmark implements the Serpent encryption algorithm.
+  </td>
+</tr>
+    
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/serpent/streamit/Serpent.str">Serpent.str</a> <a href="././benchmarks/serpent/streamit/Source.str">Source.str</a> <a href="././benchmarks/serpent/streamit/Keys.str">Keys.str</a> <a href="././benchmarks/serpent/streamit/L.str">L.str</a> <a href="././benchmarks/serpent/streamit/Utils.str">Utils.str</a> <a href="././benchmarks/serpent/streamit/Statics.str">Statics.str</a> <a href="././benchmarks/serpent/streamit/../output/output.txt">output.txt</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">tde - Time Delay Equalization</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+This is the Time Delay Equalization phase from the GMTI (Ground Moving
+Target Indiciator) application using the "Small" input dataset.  
+  </td>
+</tr>
+    
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././benchmarks/tde/streamit/tde_pp.str">tde_pp.str</a> (Pipeline-parallel version of the application that is a more natural
+fit to StreamIt.  There is some data-parallelism available by setting
+parameters in tde_pp.str, which allows us to increase the number of
+filters for use in performance studies.  This version canonicalizes
+the order of the output data.)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h2></h2>
+
+<h3></h3>
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">BatcherSort - Batcher's sorting algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  Identical to a Bitonic Sort, compares and swaps pairs of 
+  elements in parallel. 
+  </td>
+</tr>  
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/sorts/BatcherSort/BatcherSort.str">BatcherSort.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">BubbleSort - Bubble sorting algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  Simple comparison based algorithm, compares each item with adjacent one,
+  swapping their orders if required.  Causes larger values to "bubble" to
+  end of the list.  Runs in O(n^2) general case.
+  </td>
+</tr>
+<tr>
+<td align="left" valign="top"><b>Reference</b></td><td>http://linux.wku.edu/~lamonml/algor/sort/bubble.html</td>
+</tr>  
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/sorts/BubbleSort/BubbleSort.str">BubbleSort.str</a> </td>
+</tr>   
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">ComparisonCounting - Comparison counting sorting algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  Algorithm that performs an N-way split of N elements.  Each path calculates
+  the ordered index for each of the N elements by comparing it to every other
+  element.
+  </td>
+</tr>  
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/sorts/ComparisonCounting/ComparisonCounting.str">ComparisonCounting.str</a> </td>
+</tr>   
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">InsertionSort - Optimized insertion sorting algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  Implementation based off of the Diminishing Increment Sort in
+  Knuth "Sorting and Searching", 5.2.1.  Similar to basic insertion
+  sort except that it tries to make larger jumps to minimize data
+  reorderings.  
+  </td>
+</tr>  
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/sorts/InsertionSort/InsertionSort.str">InsertionSort.str</a> </td>
+</tr>   
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">MergeSort - Standard merge sort algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  Sorting algorithm that splits unordered list into halves, recursively sorts them
+  and then merges back to get the final sorted list.  Has algorithmic
+  complexity of O(n log n).  
+  </td>
+</tr>
+<tr>
+<td align="left" valign="top"><b>Reference</b></td><td>http://linux.wku.edu/~lamonml/algor/sort/merge.html</td>
+</tr>  
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/sorts/MergeSort/MergeSort.str">MergeSort.str</a> </td>
+</tr>   
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">RadixSort - Binary radix sort algorithm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+  An implementation of binary radix sort, where each successive filter sorts on
+  a different bit.  
+  </td>
+</tr>
+<tr>
+<td align="left" valign="top"><b>Reference</b></td><td>http://www.jimloy.com/computer/radix.htm</td>
+</tr>  
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/sorts/RadixSort/RadixSort.str">RadixSort.str</a> </td>
+</tr>   
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h3></h3>
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">autocor - Generates the autocorrelation of a series</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+This benchmark contains a filter, Cor1, which generates the
+autocorrelation series for some input.  The input is a series of
+vectors of a parameterizable length, and the output is the
+autocorrelation series for a specified number of lags.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/autocor/AutoCor.str">AutoCor.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">delay - Demonstration of delay filter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Demonstration of a delay filter.  Uses a prework function
+to push N initial items before passing input to output.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/delay/DelayTest.str">DelayTest.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">fib - Fibonacci number generators</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+StreamIt programs to generate Fibonacci numbers.  In general, these
+work by pushing previous values around a feedback loop, so they can be
+calculated.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/fib/Fib.str">Fib.str</a> (Basic implementation.)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/fib/FibFeed.str">FibFeed.str</a> (As before, but with a top-level feedback loop.)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/fib/Fib2.str">Fib2.str</a> (With a round-robin splitter and no peeking.)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">file - Demonstration of file writer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Demonstration of a FileWriter filter.  This generates a sequence of
+even integers as floating-point numbers, and writes them to
+float.test in binary form.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/file/FileTest.str">FileTest.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">hello - Analog of "Hello World!" in StreamIt: outputs a sequence of numbers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+This is a demonstration benchmark, intended to be the simplest
+possible StreamIt program.  There are two filters; the first generates
+an increasing sequence of numbers, the second prints this sequence.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/hello/HelloWorld.str">HelloWorld.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">lattice - Ten-stage lattice filter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Constructs a ten-stage lattice filter.  The first and last stages are
+special; otherwise, a series of mostly-identical stages are
+constructed in order and fed into a pipeline.  Two items are carried
+between each stage of the lattice filter, with the second item delayed
+by one element.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/lattice/Lattice.str">Lattice.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">matrixmult - Multiply two matrices</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Perform a matrix-matrix multiply on square matrices.  Matrices are
+translated and duplicated, such that a MultiplyAccumulate stage can
+perform vector-vector dot products to get ordered elements of the
+result matrix.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>C</b></td><td align="left" valign="top"><a href="././examples/misc/matrixmult/matrix.c">matrix.c</a> </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/matrixmult/MatrixMult.str">MatrixMult.str</a> </td>
+</tr>
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+<h5>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">vectadd - Add two vectors</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+Perform simple vector-vector adds.  In StreamIt, a vector is
+frequently just a series of consecutive elements on a single channel;
+two vectors can be added by generating elements in a splitjoin (or
+using a splitjoin to interleave the elements of the inputs), and then
+doing an elementwise add on the output.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/misc/vectadd/VectAdd.str">VectAdd.str</a> (Generate two input vectors and add them)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h5>
+
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">cookbook - Source code from the StreamIt Cookbook</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+These are the examples in the StreamIt Cookbook.
+  </td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/cookbook/Minimal.str">Minimal.str</a> (Minimal program, section 2.1)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/cookbook/MovingAverage.str">MovingAverage.str</a> (Moving average filter, section 2.2)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/cookbook/LPFProgram.str">LPFProgram.str</a> (Low-pass filter, section 2.3)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/cookbook/BPFProgram.str">BPFProgram.str</a> (Band-pass filter, section 2.4)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/cookbook/EqualizerProgram.str">EqualizerProgram.str</a> (Equalizer, section 2.5)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/cookbook/EchoProgram.str">EchoProgram.str</a> (Echo effect, section 2.6)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/cookbook/FibProgram.str">FibProgram.str</a> (Fibonacci number generator, section 2.7)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././examples/cookbook/FMRadio.str">FMRadio.str</a> (FMRadio with equalizer, section 3)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h2></h2>
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">jpeg - JPEG decoder/encoder</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+The JPEG Transcoder takes as input a JPEG image and then decodes it,
+specifies a much higher level of JPEG compression, and then re-encodes
+it as a JPEG.  JPEGtoBMP.str converts a JPEG into a BMP
+(output.bmp.int).  Conversion of file format from bits to integers is
+handled in the Makefile.
+  </td>
+</tr>
+
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././library_only/jpeg/streamit/Transcoder.str">Transcoder.str</a> <a href="././library_only/jpeg/streamit/input.jpg.int">input.jpg.int</a> (StreamIt version of JPEG encoder/decoder.)<br>
+</td>
+</tr>
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././library_only/jpeg/streamit/JPEGtoBMP.str">JPEGtoBMP.str</a> <a href="././library_only/jpeg/streamit/input.jpg.int">input.jpg.int</a> (StreamIt version of JPEG decoder to .bmp.)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+<h4>
+<table align="center" width="700" border="1">
+<colgroup>
+<col align="left">
+<col char="." align="char">
+</colgroup>
+<thead>
+<tr>
+<th align="left" bgcolor="#C0C0C0" colspan="2">mpeg2 - MPEG2 decoder/encoder</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top" width="15%"><b>Description</b></td><td align="justify">
+A MPEG2 encoder and two versions of a MPEG2 decoder.
+BMPtoMPEG encodes a few pictures to a short MPEG file.
+MPEGtoBMP decodes an MPEG file to a series of BMP files.
+MPEGplayer plays an MPEG file, but needs screen output only available in the
+ library version of StreamIt.
+MPEGdecoder_nomessage is a decoder that does not use message passing (and only decodes MPEG files without P or B frames).
+  </td>
+</tr>
+    
+    
+<tr>
+<td align="left" valign="top"><b>StreamIt</b></td><td align="left" valign="top"><a href="././library_only/mpeg2/streamit/MPEGtoBMP.str">MPEGtoBMP.str</a> <a href="././library_only/mpeg2/streamit/MPEGdecoder.str">MPEGdecoder.str</a> <a href="././library_only/mpeg2/streamit/Parser_alt_preserved_state.str">Parser_alt_preserved_state.str</a> <a href="././library_only/mpeg2/streamit/ChannelUpsampling.str">ChannelUpsampling.str</a> <a href="././library_only/mpeg2/streamit/MotionVectorDecode.str">MotionVectorDecode.str</a> <a href="././library_only/mpeg2/streamit/PictureReorder.str">PictureReorder.str</a> <a href="././library_only/mpeg2/streamit/BlockDecode.str">BlockDecode.str</a> <a href="././library_only/mpeg2/streamit/ColorChannelProcessing_opt_splitjoin.str">ColorChannelProcessing_opt_splitjoin.str</a> <a href="././library_only/mpeg2/streamit/DescrambleAndMotionCompensate.str">DescrambleAndMotionCompensate.str</a> <a href="././library_only/mpeg2/streamit/MotionPrediction.str">MotionPrediction.str</a> <a href="././library_only/mpeg2/streamit/BlockDescrambler.str">BlockDescrambler.str</a> <a href="././library_only/mpeg2/streamit/MacroBlockDescrambler.str">MacroBlockDescrambler.str</a> <a href="././library_only/mpeg2/streamit/MPEGglobal.str">MPEGglobal.str</a> <a href="././library_only/mpeg2/streamit/ColorSpace.str">ColorSpace.str</a> <a href="././library_only/mpeg2/streamit/Misc.str">Misc.str</a> <a href="././library_only/mpeg2/streamit/BinaryFile.str">BinaryFile.str</a> <a href="././library_only/mpeg2/streamit/ZigZag.str">ZigZag.str</a> <a href="././library_only/mpeg2/streamit/InverseQuantization.str">InverseQuantization.str</a> <a href="././library_only/mpeg2/streamit/BMP.str">BMP.str</a> <a href="././library_only/mpeg2/streamit/../../../benchmarks/dct_ieee/streamit/DCT.str">DCT.str</a> <a href="././library_only/mpeg2/streamit/../input/cact_015.m2v">cact_015.m2v</a> (The decoder with messaging.)<br>
+</td>
+</tr>
+  
+</tbody>
+</table>
+</h4>
+
+
+
+
+
+</body>
+</html>

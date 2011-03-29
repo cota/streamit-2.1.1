@@ -1,0 +1,9 @@
+### EXEC INFO MODULE FOR: mpeg2enc input 1
+
+# input1 is from 
+SETUP="rm -f *.U *.V *.Y *.par; cp $BASE_DIR/input1/*.U .; cp $BASE_DIR/input1/*.V .; cp $BASE_DIR/input1/*.Y .; cp $BASE_DIR/input1/*.par .";
+PREFIX="";
+ARGS="options.par out.m2v";
+CHECK="diff out.m2v $BASE_DIR/output1/out.m2v ; diff stat.out $BASE_DIR/output1/stat.out ; diff $STDERR_FILE $BASE_DIR/output1/mpeg2enc_input1.result";
+CLEANUP="rm -f *.U *.V *.Y *.par out.m2v stat.out;";
+

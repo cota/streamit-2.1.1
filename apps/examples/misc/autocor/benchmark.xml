@@ -1,0 +1,16 @@
+<benchmark>
+  <name>autocor</name>
+  <desc>Generates the autocorrelation of a series</desc>
+  <description>
+This benchmark contains a filter, Cor1, which generates the
+autocorrelation series for some input.  The input is a series of
+vectors of a parameterizable length, and the output is the
+autocorrelation series for a specified number of lags.
+  </description>
+  <implementations>
+    <impl lang="StreamIt">
+      <file class="source">AutoCor.str</file>
+      <file class="output">AutoCor.out</file>
+    </impl>
+  </implementations>
+</benchmark>

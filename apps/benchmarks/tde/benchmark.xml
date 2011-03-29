@@ -1,0 +1,27 @@
+<benchmark>
+  <name>tde</name>
+  <desc>Time Delay Equalization</desc>
+  <description>
+This is the Time Delay Equalization phase from the GMTI (Ground Moving
+Target Indiciator) application using the "Small" input dataset.  
+  </description>
+  <implementations>
+    <impl lang="StreamIt" dir="streamit" id="tde" compile_time="4800" run_time="2400">
+      <file>tde.str</file>
+      <desc>Performs a 12-way data-parallel version of the algorithm (just a
+convolution), imitating the way that the C code from this phase in
+GMTI would be compiled by RStream and parallelized.  Makes no pretense
+at ordering the output data in a canonical way: it is expected to
+connect with another GMTI phase that has been parallelized in such a
+way as to accept its data.</desc>
+    </impl>
+    <impl lang="StreamIt" dir="streamit" id="tde-pp" compile_time="4800" run_time="3600">
+      <file>tde_pp.str</file>
+      <desc>Pipeline-parallel version of the application that is a more natural
+fit to StreamIt.  There is some data-parallelism available by setting
+parameters in tde_pp.str, which allows us to increase the number of
+filters for use in performance studies.  This version canonicalizes
+the order of the output data.</desc>
+    </impl>
+  </implementations>
+</benchmark>

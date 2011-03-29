@@ -1,0 +1,195 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+            "http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD><TITLE>StreamIt 2.1.1 Release</TITLE>
+
+<META http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<META name="GENERATOR" content="hevea 1.06">
+</HEAD>
+<BODY >
+<!--HEVEA command line is: hevea -nosymb readme.tex -->
+<!--HTMLHEAD-->
+<!--ENDHTML-->
+<!--PREFIX <ARG ></ARG>-->
+<!--CUT DEF section 1 -->
+
+
+<H1 ALIGN=center>StreamIt 2.1.1 Release</H1>
+
+
+This is for the January 29, 2007 release of the StreamIt compiler and
+runtime system, version 2.1.1.<BR>
+<CODE>$Id: readme.tex.in,v 1.26 2006/09/11 20:04:10 thies Exp $</CODE><BR>
+<BR>
+<!--TOC section What is this?-->
+
+<H2><A NAME="htoc1">1</A>&nbsp;&nbsp;What is this?</H2><!--SEC END -->
+
+StreamIt is a programming language designed for efficient
+implementation of streaming systems, particularly digital signal
+processing applications. This is a public release of the StreamIt
+compiler. While the compiler is still under active development, we
+believe this release should be useful for developing StreamIt
+applications. See "caveats", below, and report bugs and feature
+requests to <TT>streamit@cag.csail.mit.edu</TT>. This compiler should
+produce functional code for uniprocessor targets, multicore
+architectures, clusters of workstations, and the MIT Raw processor.
+There is also a runtime library for testing programs through a Java
+compiler.<BR>
+<BR>
+There are two versions of this release. These are:
+<DL COMPACT=compact><DT>
+<B>streamit-src-2.1.1.tar.gz</B><DD> "Source release." This contains the
+ full sources of the StreamIt compiler and runtime libraries, but no
+ binaries. Build instructions are included in the INSTALL file.<BR>
+<BR>
+<DT><B>streamit-2.1.1.tar.gz</B><DD> "Binary release." This contains no
+ sources, but does contain a Java jar file with the full compiler.
+</DL>
+The StreamIt compiler is built on top of version 1.5B of the Kopi Java
+compiler from DMS Decision Management Systems GmbH. The independent
+components of the system, including the scheduler, Java runtime
+library, C/C++ libraries, the front end, and the StreamIt .str files,
+are released subject to the terms of the MIT license agreement. Other
+components of the system are released under the terms of the GNU
+General Public License; see the <FONT COLOR=purple>COPYING</FONT> file for details.
+The binary release also include class files from the ANTLR LL(k)
+parser generator.<BR>
+<BR>
+Several documents on StreamIt are in the <FONT COLOR=purple>docs</FONT> directory.
+You can find more information on our Web page, at
+<A HREF="http://cag.csail.mit.edu/streamit/"><TT>http://cag.csail.mit.edu/streamit/</TT></A>.<BR>
+<BR>
+<!--TOC section Dependencies-->
+
+<H2><A NAME="htoc2">2</A>&nbsp;&nbsp;Dependencies</H2><!--SEC END -->
+
+The StreamIt makefile infrastructure uses the GNU tools, which are
+available from <A HREF="http://www.gnu.org"><TT>http://www.gnu.org</TT></A>. In particular, GNU Make is
+required to build; this is the default &lt;tt&gt;make&lt;/tt&gt; on Linux
+machines, and may be available as &lt;tt&gt;gmake&lt;/tt&gt; on other Unix-like
+machines. The source release depends on Sun's Java compiler (javac).
+Both the source and binary releases require a Java virtual machine for
+Java version 1.5 or later; see <A HREF="http://java.sun.com/"><TT>http://java.sun.com/</TT></A> for
+possibilities.<BR>
+<BR>
+The front end depends on the ANTLR LL(<I>k</I>) parser generator; see
+<A HREF="http://www.antlr.org/"><TT>http://www.antlr.org/</TT></A>. If you are using the source release, the
+ANTLR classes must be in your Java <FONT COLOR=purple>CLASSPATH</FONT> when compiling
+and running the StreamIt compiler. If you are using the binary
+release, the required ANTLR classes are already included in the
+StreamIt jar file.<BR>
+<BR>
+The linear optimizations (not turned on by default) depend on the FFTW
+library; see <A HREF="http://www.fftw.org/"><TT>http://www.fftw.org/</TT></A>. The StreamIt runtime system
+currently only supports fftw-2.1.x, not the newer fftw-3.0 branch.
+FFTW should be installed somewhere in your default compiler search
+path. You need to build single-precision versions of the library,
+such that you have include files <FONT COLOR=purple>sfftw.h</FONT>,
+<FONT COLOR=purple>srfftw.h</FONT> and library files <FONT COLOR=purple>libsfftw.a</FONT> and
+<FONT COLOR=purple>libsrfftw.a</FONT>. 
+The linear optimizations are turned on only if <TT>configure</TT>
+can find all four files. 
+ If you are building FFTW from source, pass 
+the following options to configure: <TT>--enable-shared --enable-type-prefix --enable-threads</TT> <BR>
+<TT>--enable-float</TT>.<BR>
+<BR>
+While this is not a a dependency, the <TT>graphviz</TT> package from
+<A HREF="http://www.graphviz.org"><TT>http://www.graphviz.org</TT></A> contains a viewer, <TT>dotty</TT>, that
+will display the dot files created by the StreamIt compiler.<BR>
+<BR>
+<!--TOC section Caveats-->
+
+<H2><A NAME="htoc3">3</A>&nbsp;&nbsp;Caveats</H2><!--SEC END -->
+
+This is a <EM>snapshot</EM> release of the StreamIt compiler. This is a
+research compiler; as such, it has several known shortcomings:
+<UL><LI>The compiler works by converting StreamIt syntax to a Java
+ intermediate form, and then using a Java compiler. Of note,
+ compiling 'foo.str' will clobber a file named 'foo.java' in the
+ same directory.<BR>
+<BR>
+<LI>The dimensions of a filter field cannot be declared in terms of
+another filter field. That is, code of the following form will fail:
+<PRE>
+float-&gt;float filter Foo {
+  int N = 10;
+  float[N] coeff;
+  ...
+}
+</PRE>In such cases, just declare the array to be <CODE>float[10]</CODE>.<BR>
+<BR>
+<LI>In splitjoins and feedbackloops, splitters and joiners cannot be
+specified from within conditional code. For example, the following
+code causes problems:
+<PRE>
+float-&gt;float splitjoin Bar {
+  if (...) {
+    split duplicate;
+  } else {
+    split roundrobin;
+  }
+}
+</PRE>If you really need such a conditional, then define two separate
+splitjoins (Bar1 and Bar2) and do the test when adding them to a
+parent stream:
+<PRE>
+float-&gt;float pipeline Parent {
+  if (...) {
+    add Bar1(); // uses duplicate splitter
+  } else {
+    add Bar2(); // uses roundrobin splitter
+  }
+}
+</PRE><LI>The compiler does not support passing structures or complex
+ numbers as stream parameters. This will result in an error such as
+<PRE>
+at.dms.util.InconsistencyException: Expected constant arguments to
+init, but found non-constant VarExp:p in parent SIRPipeline
+name=pipe_3
+</PRE>
+ Structures and complex should work as local variables and as the
+ input or output types of filters.<BR>
+<BR>
+<LI>Arrays cannot be returned from helper functions.<BR>
+<BR>
+<LI>In most back ends, arrays cannot be used as the input or output
+types of streams. This is largely a limitation in the uniprocessor
+back end; you can get equivalent code by using streams of the base type
+of the array, and constructing the array inside the work function if
+necessary.<BR>
+<BR>
+<LI>The <TT>static block</TT>s are limited (except in the Java
+library back end) in that they act as specified only if every declared
+variable in the static block is assigned to exactly
+once. Furthermore, there can currently be at most one static block in
+a program.</UL>
+<!--TOC section For more info-->
+
+<H2><A NAME="htoc4">4</A>&nbsp;&nbsp;For more info</H2><!--SEC END -->
+
+The StreamIt home page is at <A HREF="http://cag.csail.mit.edu/streamit/"><TT>http://cag.csail.mit.edu/streamit/</TT></A>.
+There are a number of places you can send electronic mail to:
+<DL COMPACT=compact><DT>
+<B>streamit@cag.csail.mit.edu</B><DD>
+ General information on StreamIt, to report bugs in the compiler or
+ request new language features, or to be added to streamit-users
+ or streamit-dev<BR>
+<BR>
+<DT><B>streamit-users@cag.csail.mit.edu</B><DD>
+ Discussion list for application developers and others using the
+ StreamIt compiler<BR>
+<BR>
+<DT><B>streamit-dev@cag.csail.mit.edu</B><DD>
+ Discussion list for people working on the internals of the
+ StreamIt compiler
+</DL>
+<!--HTMLFOOT-->
+<!--ENDHTML-->
+<!--FOOTER-->
+<HR SIZE=2>
+<BLOCKQUOTE><EM>This document was translated from L<sup>A</sup>T<sub>E</sub>X by
+</EM><A HREF="http://pauillac.inria.fr/~maranget/hevea/index.html"><EM>H<FONT SIZE=2><sup>E</sup></FONT>V<FONT SIZE=2><sup>E</sup></FONT>A</EM></A><EM>.
+</EM></BLOCKQUOTE>
+</BODY>
+</HTML>

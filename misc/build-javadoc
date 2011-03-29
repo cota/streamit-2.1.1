@@ -1,0 +1,85 @@
+#!/bin/sh
+###############################################################################
+# build-javadoc: creates a Javadoc tree from the StreamIt sources
+# David Maze <dmaze@cag.lcs.mit.edu>
+# $Id: build-javadoc,v 1.10 2006/08/29 23:43:02 dimock Exp $
+#
+# Takes as implicit input the shell variable $STREAMIT_HOME, which 
+#  is the root of the StreamIt directory heirarchy.
+#
+# Takes an optional argument on the command linke indicating where to put
+# the extracted documentation.  If this parameter is not given then the 
+# extracted documentation will be put in $STREAMIT_HOME/javadoc
+#
+# Extracts documentation from all subdirectories of $STREAMIT_HOME/src
+# that contain .java files -- except $STREAMIT_HOME/src/streamit/eclipse and 
+# its subdirectories.
+# 
+###############################################################################
+
+if [ -n "$1" ]; then 
+  OUTDIR=$1
+else 
+  OUTDIR=$STREAMIT_HOME/javadoc
+fi
+
+echo "creating Javadoc documentation for StreamIt in $OUTDIR"
+
+rm -rf $OUTDIR
+mkdir $OUTDIR
+
+# (conceivably also 3rdparty...)
+DIRS="src"
+SOURCEPATHS="-sourcepath "
+for i in $DIRS; do
+  SOURCEPATHS="$SOURCEPATHS:$STREAMIT_HOME/$i"
+done
+
+# Our package list:
+# all subdirectories of $DIRS transitively, with leading '/'
+# removed and internal '/' changed to '.'
+for i in $DIRS; do
+  NEWPACKAGES=`cd $STREAMIT_HOME/$i; find . -follow -type f -name '*.java' -not -name CVS -print | sed -e 's@/[^/]*$@@' -e 's@/@.@g' -e 's@^\.*@@' | sort -u`
+  PREPACKAGES="$PACKAGES $NEWPACKAGES"
+done
+
+
+for PKG in $PREPACKAGES; do
+ if [[ `expr match "$PKG" 'streamit\.eclipse'` -ne `expr length "streamit.eclipse"` ]]; 
+ then
+  PACKAGES="$PACKAGES $PKG"
+ fi
+done
+
+#echo $PACKAGES
+
+# We seem to have some "debug" Eclipse packages, so adding these -links
+# doesn't actually help matters any.
+#  -link http://dev.eclipse.org/help21/topic/org.eclipse.platform.doc.isv/reference/api/ \
+#  -link http://dev.eclipse.org/help21/topic/org.eclipse.jdt.doc.isv/reference/api/ \
+
+#/usr/uns/bin/javadoc -J-Xmx128M -source 1.4 -use -version -author \
+#  -link http://java.sun.com/j2se/1.4.1/docs/api/ \
+
+javadoc -J-Xmx128M -source 1.5 -use -version -author \
+  -link http://java.sun.com/j2se/1.5.0/docs/api/ \
+  -link http://www.antlr.org/javadoc/ \
+  -doctitle 'StreamIt Compiler Documentation' \
+  -d $OUTDIR \
+  -group 'StreamIt Front End Packages' 'streamit.frontend*' \
+  -group 'StreamIt Library Packages' 'streamit.library*:streamit.misc' \
+  -group 'Streamit SIR representation' 'at.dms.kjc.sir' \
+  -group 'StreamIt LIR Rep and Uni code generator' 'at.dms.kjc.lir' \
+  -group 'Kopi Rep with StreamitChanges' 'at.dms.kjc.kjc' \
+  -group 'StreamIt Uni and general compiler passes' 'at.dms.kjc.sir.lowering* ' \
+  -group 'StreamIt Cluster compiler' 'at.dms.kjc.cluster*' \
+  -group 'StreamIt Rstream compiler' 'at.dms.kjc.rstream*' \
+  -group 'Streamit Raw space compiler' 'at.dms.kjc.raw*' \
+  -group 'Streamit Raw spacetime compiler' 'at.dms.kjc.spacetime*' \
+  -group 'Streamit Raw spacedynamic compiler' 'at.dms.kjc.spacedynamic*' \
+  -group 'Other StreamIt Compiler Packages' 'at.dms.kjc*:streamit.iriter' \
+  -group 'StreamIt Scheduler Packages' 'streamit.scheduler*' \
+  -group 'Eclipse Integration' 'grapheditor*:texteditor*:launcher*' \
+  -group 'Other Kopi Packages' 'at.dms.*' \
+  -group 'Third-Party Packages' '3rdparty.*' \
+  $SOURCEPATHS $PACKAGES
