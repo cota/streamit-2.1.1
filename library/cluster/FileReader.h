@@ -37,13 +37,13 @@ public:
 
 /* Routines that are independent of <T>, make them not be in class */
 
-extern int FileReader_open(char *pathname);
+extern long FileReader_open(char *pathname);
 
-extern void FileReader_close(int fs_ptr);
+extern void FileReader_close(long fs_ptr);
 
-extern int FileReader_getpos(int fs_ptr);
+extern int FileReader_getpos(long fs_ptr);
 
-extern void FileReader_setpos(int fs_ptr, int pos);
+extern void FileReader_setpos(long fs_ptr, int pos);
 
 template<class T>
 static inline T FileReader_read(int fs_ptr) {
