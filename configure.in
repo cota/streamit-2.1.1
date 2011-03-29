@@ -57,8 +57,9 @@ dnl fi
 dnl
 dnl The following works to identify versions of Hotspot only:
 dnl If they hava a java compiler, we could do better
-if $JAVA -version 2>&1 | grep -q 1\\\.5 > /dev/null; then
-dnl OK: have sun java 1.5 -- sun java takes -version and outpts to stderr
+if $JAVA -version 2>&1 | sed 's/@<:@^0-9@:>@*\(@<:@0-9@:>@@<:@.0-9@:>@*\).*/\1/' | \
+   grep -q '@<:@1-9@:>@.@<:@5-9@:>@' > /dev/null; then
+dnl OK: have sun java 1.5 or higher -- sun java takes -version and outpts to stderr
 JAVA5=1
 else
 JAVA5=0
